@@ -27,3 +27,19 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+### Java ###
+*.class
+*.log
+*.jar
+*.war
+*.ear
+
+# Generated files
+target/
+build/
+
+# Backup files
+*~
+*.swp
+*.swo
