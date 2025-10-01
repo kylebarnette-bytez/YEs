@@ -1,8 +1,8 @@
 package board;
 
 public class Position {
-    private int row;    // 0–7
-    private int col;    // 0–7
+    private final int row;    // 0–7
+    private final int col;    // 0–7
 
     public Position(int row, int col) {
         this.row = row;
