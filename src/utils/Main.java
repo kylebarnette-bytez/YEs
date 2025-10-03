@@ -1,28 +1,22 @@
 package utils;
+
 import game.Game;
-import board.Board;
 
 /**
- * Entry point for testing the chess program.
+ * The entry point of the Chess program.
+ * <p>
+ * This class simply creates a Game object and runs it.
+ * </p>
  */
 public class Main {
+    /**
+     * Starts the program by creating and running a Game.
+     *
+     * @param args command-line arguments (not used)
+     */
     public static void main(String[] args) {
-
-
-        // Create and start a new game
         Game game = new Game();
-        game.start();   // sets up board + initial turn
-        game.play();    // runs the game loop
-        // Create a new Board
-//        Board board = new Board();
-//
-//        // Display the starting board
-//        System.out.println("Initial Board:");
-//        board.display();
-
-        // (Optional) Later: you can test moves here
-        // Example placeholder (when Position + pieces are ready):
-        // board.movePiece(new Position(6, 4), new Position(4, 4));
-        // board.display();
+        game.start();
+        game.play();
     }
 }
