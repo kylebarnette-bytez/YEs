@@ -41,8 +41,10 @@ java -cp out utils.Main
 ---
 
 ## 📖 Documentation
-Javadoc HTML has been generated and is available in the `docs/` folder.  
-Open `docs/index.html` in a web browser to browse the class documentation.  
+Javadoc HTML has been generated and is available in the `YEs/` folder.  
+Open `YEs/index.html` in a web browser to browse the class documentation.
+
+---index.html available on Request---
 
 ---
 

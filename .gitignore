@@ -1,5 +1,4 @@
 
-!YEs/
 
 
 ### IntelliJ IDEA ###
@@ -49,4 +48,8 @@ build/
 *~
 *.swp
 *.swo
+
+
+#Allow Javadocs
+!YEs/
 
