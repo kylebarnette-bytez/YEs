@@ -24,7 +24,7 @@ public class Pawn extends Piece {
 	 * @param color "white" or "black"
 	 * @param position current position of the Pawn on the board
 	 */
-	 public Pawn(String color, Position position) {
+	public Pawn(String color, Position position) {
 		 super(color, position);
 	 }
 
