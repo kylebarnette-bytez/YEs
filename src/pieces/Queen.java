@@ -20,7 +20,8 @@ public class Queen extends Piece {
 
 	/**
 	 * Returns all possible moves for the Queen from its current position.
-	 * The Queen can move
+	 * The Queen can move vertically, horizontally, and diagonally as far as
+	 * it wants (assuming no obstacles and is within the board).
 	 *
 	 * @return list of possible positions the Queen can move to
 	 */
