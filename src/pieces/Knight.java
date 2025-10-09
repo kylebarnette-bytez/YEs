@@ -26,7 +26,7 @@ public class Knight extends Piece {
 	 */
 	@Override
 	public List<Position> possibleMoves() {
-		List<position> = new ArrayList<Position>();
+		List<Position> moves = new ArrayList<Position>();
 		int row = position.getRow();
 		int col = position.getCol();
 		
@@ -50,7 +50,8 @@ public class Knight extends Piece {
 	/**
 	 * Checks if a position is within the board bounds (0–7 for both row and col).
 	 */
-	private boolean isInBounds(int row, int col) {
+	@Override
+	protected boolean isInBounds(int row, int col) {
 		return row >= 0 && row < 8 && col >= 0 && col < 8;
 	}
 }

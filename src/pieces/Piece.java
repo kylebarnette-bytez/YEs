@@ -4,52 +4,39 @@ import board.Position;
 import java.util.List;
 
 /**
- * The Piece abstract class defines the generic functions of the chess pieces.
- * This includes the piece color, position, and methods to get all possible positions
- * the piece can move to on the board and actually moving the piece.
+ * Abstract base class for all chess pieces.
  */
 public abstract class Piece {
-	/** Piece color "white" or "black" */
-	protected String color;
-	/** Current location on the board */
-	protected Position position;
+	protected String color;        // "white" or "black"
+	protected Position position;   // current board position
 
-	/**
-	 * Constructs a Piece with a given color and position.
-	 * 
-	 * @param color "white" or "black"
-	 * @param position current position of the piece on the board
-	 */
 	public Piece(String color, Position position) {
 		this.color = color;
 		this.position = position;
 	}
 
-	/**
-	 * Gets the color of the piece.
-	 *
-	 * @return color of the piece
-	 */
-	public String getColor() { return color; }
-	
-	/**
-	 * Gets the position of the piece.
-	 *
-	 * @return position of the piece
-	 */
-	public Position getPosition() { return position; }
-	
-	/**
-	 * Sets the position of the piece.
-	 *
-	 * @param pos the new position
-	 */
-	public void setPosition(Position pos) { this.position = pos; }
+	public String getColor() {
+		return color;
+	}
+
+	public Position getPosition() {
+		return position;
+	}
+
+	public void setPosition(Position newPosition) {
+		this.position = newPosition;
+	}
 
 	/**
-	 * Gets all possible moves the piece can perform based on its movement rules.
-	 *
-	 * @return list of all possible moves
+	 * Each subclass implements its own move logic.
+	 * @return list of valid positions this piece can move to
 	 */
 	public abstract List<Position> possibleMoves();
+
+	/**
+	 * Utility for subclasses to check if a move is on the board.
+	 */
+	protected boolean isInBounds(int row, int col) {
+		return row >= 0 && row < 8 && col >= 0 && col < 8;
+	}
 }
