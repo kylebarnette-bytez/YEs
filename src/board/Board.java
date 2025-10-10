@@ -235,7 +235,10 @@ public class Board {
 
 		return true;
 	}
-	
+
+
+
+
 	/**
 	 * Checks if any pieces exist between two positions (exclusive).
 	 * Assumes the move is either straight or diagonal.
@@ -266,4 +269,72 @@ public class Board {
 
 		return false; // No obstruction found
 	}
+
+	public boolean isCheck(Color color) {
+		Position kingPosition = findKing(color);
+		if (kingPosition == null) return false;
+
+		Color opponentColor = (color == Color.WHITE) ? Color.BLACK : Color.WHITE;
+
+		for (int row = 0; row < 8; row++) {
+			for (int col = 0; col < 8; col++) {
+				Piece piece = board[row][col];
+				if (piece != null && piece.getColor() == opponentColor) {
+					List<Position> moves = piece.possibleMoves(this);
+					if (moves.contains(kingPosition)) {
+						return true;
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	private Position findKing(Color color) {
+		for (int row = 0; row < 8; row++) {
+			for (int col = 0; col < 8; col++) {
+				Piece piece = board[row][col];
+				if (piece instanceof King && piece.getColor() == color) {
+					return new Position(row, col);
+				}
+			}
+		}
+		return null;
+	}
+
+	public boolean isCheckmate(Color color) {
+		if (!isCheck(color)) return false;
+
+		for (int row = 0; row < 8; row++) {
+			for (int col = 0; col < 8; col++) {
+				Piece piece = board[row][col];
+				if (piece != null && piece.getColor() == color) {
+					List<Position> moves = piece.possibleMoves(this);
+					for (Position move : moves) {
+						Board temp = this.copy(); // Clone board (deep copy)
+						temp.movePiece(piece.getPosition(), move);
+						if (!temp.isCheck(color)) {
+							return false; // Found a move that gets out of check
+						}
+					}
+				}
+			}
+		}
+		return true; // No move gets you out of check
+	}
+
+	public Board copy() {
+		Board newBoard = new Board();
+		for (int row = 0; row < 8; row++) {
+			for (int col = 0; col < 8; col++) {
+				if (board[row][col] != null) {
+					newBoard.board[row][col] = board[row][col].clone();
+				}
+			}
+		}
+		return newBoard;
+	}
+
+
+
 }
