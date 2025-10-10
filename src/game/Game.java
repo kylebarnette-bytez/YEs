@@ -74,7 +74,6 @@ public class Game {
                     continue;
                 }
 
-                // ✅ Enforce correct turn color
                 if (piece.getColor() != currentPlayer.getColor()) {
                     System.out.println("⚠️ You can only move your own pieces.");
                     continue;
@@ -83,7 +82,14 @@ public class Game {
                 board.movePiece(from, to);
                 board.display();
 
-                printPlayerPieces(); // 🧪 optional debug after each move
+                Player opponent = (currentPlayer == whitePlayer) ? blackPlayer : whitePlayer;
+                if (board.isCheck(opponent.getColor())) {
+                    System.out.println("⚠️ " + opponent.getName() + " is in CHECK!");
+                    if (board.isCheckmate(opponent.getColor())) {
+                        System.out.println("♔ Checkmate! " + opponent.getName() + " loses.");
+                        break;
+                    }
+                }
 
                 switchTurn();
             } catch (IllegalArgumentException e) {

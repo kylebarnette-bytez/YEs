@@ -147,16 +147,25 @@ public class Board {
 	 * Moves a piece from one square to another if valid.
 	 * Also handles capturing and updating player piece lists.
 	 */
-	public void movePiece(Position from, Position to) {
+	public void movePiece(Position from, Position to, boolean verbose) {
+
 		Piece moving = board[from.getRow()][from.getCol()];
 
+		// Handle empty square case
 		if (moving == null) {
-			System.out.println("No piece at source square.");
+			if (verbose) {
+				System.out.println("No piece at source square.");
+			}
 			return;
 		}
 
+		// Validate movement rules
 		if (!validateMove(from, to)) {
-			throw new IllegalArgumentException("Move violates movement rules.");
+			if (verbose) {
+				throw new IllegalArgumentException("Move violates movement rules.");
+			} else {
+				return;
+			}
 		}
 
 		// Handle capture
@@ -169,11 +178,16 @@ public class Board {
 			}
 		}
 
-		// Perform move
+		// Perform the move
 		board[to.getRow()][to.getCol()] = moving;
 		moving.move(to);
 		board[from.getRow()][from.getCol()] = null;
 	}
+
+	public void movePiece(Position from, Position to) {
+		movePiece(from, to, true);
+	}
+
 
 	/**
 	 * Displays the current board state in the console.
@@ -254,9 +268,34 @@ public class Board {
 	/**
 	 * Checks if a given color is in checkmate.
 	 */
+//	public boolean isCheckmate(Color color) {
+//		if (!isCheck(color)) return false;
+//
+//		for (int row = 0; row < 8; row++) {
+//			for (int col = 0; col < 8; col++) {
+//				Piece piece = board[row][col];
+//				if (piece != null && piece.getColor() == color) {
+//					List<Position> moves = piece.possibleMoves(this);
+//					for (Position move : moves) {
+//						Board temp = this.copy();
+//						temp.movePiece(piece.getPosition(), move, false);
+//						if (!temp.isCheck(color)) {
+//							return false;
+//						}
+//					}
+//				}
+//			}
+//		}
+//		return true;
+//	}
+	/**
+	 * Checks if a given color is in checkmate.
+	 */
 	public boolean isCheckmate(Color color) {
+		// If the king is not currently in check, it's not checkmate
 		if (!isCheck(color)) return false;
 
+		// Check every piece belonging to this color
 		for (int row = 0; row < 8; row++) {
 			for (int col = 0; col < 8; col++) {
 				Piece piece = board[row][col];
@@ -264,16 +303,26 @@ public class Board {
 					List<Position> moves = piece.possibleMoves(this);
 					for (Position move : moves) {
 						Board temp = this.copy();
-						temp.movePiece(piece.getPosition(), move);
-						if (!temp.isCheck(color)) {
-							return false;
+						try {
+							// ⚡ simulate the move silently
+							temp.movePiece(piece.getPosition(), move, false);
+
+							// If the king is NOT in check after this move, not checkmate
+							if (!temp.isCheck(color)) {
+								return false;
+							}
+						} catch (IllegalArgumentException ignored) {
+							// Ignore invalid moves during simulation
 						}
 					}
 				}
 			}
 		}
+
+		// No legal moves get the king out of check — checkmate
 		return true;
 	}
+
 
 	/**
 	 * Returns a shallow copy of the current board.

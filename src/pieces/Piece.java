@@ -67,15 +67,10 @@ public abstract class Piece {
 	 */
 	@Override
 	public String toString() {
-		switch (this.getClass().getSimpleName()) {
-			case "King":   return (color == Color.WHITE) ? "♔" : "♚";
-			case "Queen":  return (color == Color.WHITE) ? "♕" : "♛";
-			case "Rook":   return (color == Color.WHITE) ? "♖" : "♜";
-			case "Bishop": return (color == Color.WHITE) ? "♗" : "♝";
-			case "Knight": return (color == Color.WHITE) ? "♘" : "♞";
-			case "Pawn":   return (color == Color.WHITE) ? "♙" : "♟";
-			default: return "??";
-		}
+		String abbrev = this.getClass().getSimpleName().substring(0, 1).toUpperCase();
+		// Knight should be "N" instead of "K"
+		if (this instanceof Knight) abbrev = "N";
+		if (this instanceof Pawn) abbrev = "P";
+		return (color == Color.WHITE ? "w" : "b") + abbrev;
 	}
-
 }
