@@ -9,11 +9,22 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * Represents the chess board and manages piece placement, movement, and checks.
+ * The {@code Board} class represents an 8x8 chess board and manages
+ * piece placement, movement, and game state checks such as check and checkmate.
+ *
+ * <p>Responsibilities:
+ * <ul>
+ *   <li>Initialize the board with the standard starting chess layout.</li>
+ *   <li>Track which pieces belong to which player.</li>
+ *   <li>Provide methods to move pieces, validate moves, and check for check/checkmate conditions.</li>
+ *   <li>Render the board state in the console.</li>
+ * </ul>
+ *
+ * <p>Note: The board is represented internally as a 2D array of {@link Piece}.
  */
 public class Board {
 
-	/** 8x8 array representing the board. */
+	/** 8x8 array representing the board. Each element is a Piece or null for an empty square. */
 	private Piece[][] board = new Piece[8][8];
 
 	/** References to both players to sync piece ownership. */
@@ -21,8 +32,11 @@ public class Board {
 	private Player blackPlayer;
 
 	/**
-	 * Creates a new Board with references to both players
-	 * so their available pieces can be tracked automatically.
+	 * Constructs a new board with references to both players.
+	 * Used when starting an actual game to keep piece lists in sync with the board.
+	 *
+	 * @param whitePlayer the white player
+	 * @param blackPlayer the black player
 	 */
 	public Board(Player whitePlayer, Player blackPlayer) {
 		this.whitePlayer = whitePlayer;
@@ -30,6 +44,10 @@ public class Board {
 		initializeBoard();
 	}
 
+	/**
+	 * Constructs a board without player references.
+	 * Useful for temporary boards (e.g., checkmate simulations).
+	 */
 	public Board() {
 		this.whitePlayer = null;
 		this.blackPlayer = null;
@@ -37,18 +55,18 @@ public class Board {
 	}
 
 	/**
-	 * Initializes the board with the standard starting positions
-	 * and registers all pieces to their respective players.
+	 * Initializes the board with standard chess starting positions
+	 * and registers pieces to their respective players.
 	 */
 	private void initializeBoard() {
-		// Clear board
+		// Clear the board
 		for (int row = 0; row < 8; row++) {
 			for (int col = 0; col < 8; col++) {
 				board[row][col] = null;
 			}
 		}
 
-		// Helper to register piece with correct player
+		// Helper lambda to register pieces with the correct player
 		Consumer<Piece> registerPiece = piece -> {
 			if (piece.getColor() == Color.WHITE) {
 				whitePlayer.addPiece(piece);
@@ -57,7 +75,7 @@ public class Board {
 			}
 		};
 
-		// 🟡 Pawns
+		// 🟡 Place Pawns
 		for (int col = 0; col < 8; col++) {
 			Piece wp = new Pawn(Color.WHITE, new Position(6, col));
 			Piece bp = new Pawn(Color.BLACK, new Position(1, col));
@@ -127,7 +145,10 @@ public class Board {
 	}
 
 	/**
-	 * Returns the piece at the given position, or null if empty.
+	 * Returns the piece at the given position, or {@code null} if the square is empty.
+	 *
+	 * @param pos board coordinates
+	 * @return the piece at the position or null
 	 */
 	public Piece getPiece(Position pos) {
 		return board[pos.getRow()][pos.getCol()];
@@ -135,6 +156,9 @@ public class Board {
 
 	/**
 	 * Places a piece on the board at the given position.
+	 *
+	 * @param piece the piece to place
+	 * @param pos   the target position
 	 */
 	public void setPiece(Piece piece, Position pos) {
 		board[pos.getRow()][pos.getCol()] = piece;
@@ -144,14 +168,18 @@ public class Board {
 	}
 
 	/**
-	 * Moves a piece from one square to another if valid.
-	 * Also handles capturing and updating player piece lists.
+	 * Moves a piece from one square to another.
+	 * If {@code verbose} is true, prints messages for invalid moves.
+	 * Handles captures and updates the player’s piece lists.
+	 *
+	 * @param from    source square
+	 * @param to      target square
+	 * @param verbose whether to print errors
 	 */
 	public void movePiece(Position from, Position to, boolean verbose) {
-
 		Piece moving = board[from.getRow()][from.getCol()];
 
-		// Handle empty square case
+		// Handle empty source square
 		if (moving == null) {
 			if (verbose) {
 				System.out.println("No piece at source square.");
@@ -159,7 +187,7 @@ public class Board {
 			return;
 		}
 
-		// Validate movement rules
+		// Validate legal move
 		if (!validateMove(from, to)) {
 			if (verbose) {
 				throw new IllegalArgumentException("Move violates movement rules.");
@@ -168,7 +196,7 @@ public class Board {
 			}
 		}
 
-		// Handle capture
+		// Handle capture if target square is occupied
 		Piece dest = board[to.getRow()][to.getCol()];
 		if (dest != null) {
 			if (dest.getColor() == Color.WHITE) {
@@ -178,19 +206,24 @@ public class Board {
 			}
 		}
 
-		// Perform the move
+		// Execute the move
 		board[to.getRow()][to.getCol()] = moving;
 		moving.move(to);
 		board[from.getRow()][from.getCol()] = null;
 	}
 
+	/**
+	 * Moves a piece with verbose errors enabled by default.
+	 *
+	 * @param from source square
+	 * @param to   target square
+	 */
 	public void movePiece(Position from, Position to) {
 		movePiece(from, to, true);
 	}
 
-
 	/**
-	 * Displays the current board state in the console.
+	 * Prints a text-based rendering of the board to the console.
 	 */
 	public void display() {
 		System.out.println("   A  B  C  D  E  F  G  H");
@@ -211,6 +244,11 @@ public class Board {
 
 	/**
 	 * Validates whether a move from one position to another is legal.
+	 * This checks both the piece’s movement rules and team color conflicts.
+	 *
+	 * @param from source square
+	 * @param to   target square
+	 * @return true if the move is valid, false otherwise
 	 */
 	public boolean validateMove(Position from, Position to) {
 		Piece piece = getPiece(from);
@@ -219,7 +257,7 @@ public class Board {
 		List<Position> possibleMoves = piece.possibleMoves(this);
 		if (!possibleMoves.contains(to)) return false;
 
-		// Can't capture your own piece
+		// Prevent capturing your own piece
 		Piece dest = getPiece(to);
 		if (dest != null && dest.getColor() == piece.getColor()) {
 			return false;
@@ -230,6 +268,9 @@ public class Board {
 
 	/**
 	 * Finds and returns the position of the king of the given color.
+	 *
+	 * @param color the king’s color
+	 * @return king position, or null if not found (should never happen in a real game)
 	 */
 	private Position findKing(Color color) {
 		for (int row = 0; row < 8; row++) {
@@ -244,7 +285,10 @@ public class Board {
 	}
 
 	/**
-	 * Checks if a given color is currently in check.
+	 * Checks whether the king of the given color is currently in check.
+	 *
+	 * @param color color to check
+	 * @return true if in check, false otherwise
 	 */
 	public boolean isCheck(Color color) {
 		Position kingPos = findKing(color);
@@ -266,36 +310,16 @@ public class Board {
 	}
 
 	/**
-	 * Checks if a given color is in checkmate.
-	 */
-//	public boolean isCheckmate(Color color) {
-//		if (!isCheck(color)) return false;
-//
-//		for (int row = 0; row < 8; row++) {
-//			for (int col = 0; col < 8; col++) {
-//				Piece piece = board[row][col];
-//				if (piece != null && piece.getColor() == color) {
-//					List<Position> moves = piece.possibleMoves(this);
-//					for (Position move : moves) {
-//						Board temp = this.copy();
-//						temp.movePiece(piece.getPosition(), move, false);
-//						if (!temp.isCheck(color)) {
-//							return false;
-//						}
-//					}
-//				}
-//			}
-//		}
-//		return true;
-//	}
-	/**
-	 * Checks if a given color is in checkmate.
+	 * Checks whether the given color is in checkmate.
+	 *
+	 * @param color the color to check for checkmate
+	 * @return true if checkmate, false otherwise
 	 */
 	public boolean isCheckmate(Color color) {
-		// If the king is not currently in check, it's not checkmate
+		// Step 1: If the king is not currently in check, it's not checkmate
 		if (!isCheck(color)) return false;
 
-		// Check every piece belonging to this color
+		// Step 2: Check every piece belonging to this color
 		for (int row = 0; row < 8; row++) {
 			for (int col = 0; col < 8; col++) {
 				Piece piece = board[row][col];
@@ -304,10 +328,10 @@ public class Board {
 					for (Position move : moves) {
 						Board temp = this.copy();
 						try {
-							// ⚡ simulate the move silently
+							// ⚡ Simulate the move silently
 							temp.movePiece(piece.getPosition(), move, false);
 
-							// If the king is NOT in check after this move, not checkmate
+							// If the king is NOT in check after this move → not checkmate
 							if (!temp.isCheck(color)) {
 								return false;
 							}
@@ -319,13 +343,15 @@ public class Board {
 			}
 		}
 
-		// No legal moves get the king out of check — checkmate
+		// Step 3: No legal moves can escape check — checkmate
 		return true;
 	}
 
-
 	/**
-	 * Returns a shallow copy of the current board.
+	 * Creates a shallow copy of the current board.
+	 * Used for check/checkmate simulations without altering real state.
+	 *
+	 * @return new Board instance with the same piece layout
 	 */
 	public Board copy() {
 		Board newBoard = new Board(whitePlayer, blackPlayer);
