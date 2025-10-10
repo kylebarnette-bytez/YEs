@@ -1,57 +1,61 @@
 package game;
 
+import utils.Color;
 import board.Board;
-import board.Position;
+import position.Position;
+import pieces.Piece;
 
 import java.util.Scanner;
 
 /**
  * The Game class manages the flow of a chess game.
- * It is responsible for:
- * - Initializing the board
- * - Managing player turns
- * - Running the game loop for user input
- *
- * Phase 1: Basic game skeleton with simple move input and display.
- * Future phases: Move validation, check/checkmate detection, timers, etc.
+ * Responsibilities:
+ * - Initialize board and players
+ * - Manage turn order
+ * - Handle user input
+ * - Perform move validation
+ * - (Future) Check/checkmate handling
  */
 public class Game {
-    /** The chess board for the game. */
+
+    /** Game board */
     private Board board;
 
-    /** White and Black players. */
+    /** White and Black players */
     private Player whitePlayer;
     private Player blackPlayer;
 
-    /** Current player taking a turn. */
+    /** Whose turn it currently is */
     private Player currentPlayer;
 
-    /** Scanner for user input. */
+    /** Input scanner */
     private final Scanner scanner = new Scanner(System.in);
 
     /**
-     * Starts a new game by creating a fresh board and setting
-     * the first player to white. Displays the initial board.
+     * Starts a new game by creating players and initializing the board.
      */
     public void start() {
-        board = new Board();
-        whitePlayer = new Player("Alice", "white");
-        blackPlayer = new Player("Bob", "black");
+        whitePlayer = new Player("Alice", Color.WHITE);
+        blackPlayer = new Player("Bob", Color.BLACK);
+
+        // Pass players to board so it can populate their pieces
+        board = new Board(whitePlayer, blackPlayer);
         currentPlayer = whitePlayer;
 
         System.out.println("Initial Board:");
         board.display();
+
+        printPlayerPieces(); // 🧪 Optional debug output
     }
 
     /**
-     * Runs the main game loop until the user quits.
-     * Currently allows text-based input for moves (e.g. "E2 E4").
+     * Main game loop. Runs until user types "quit".
      */
     public void play() {
         System.out.println("Game loop starting...");
 
         while (true) {
-            System.out.println("Turn: " + currentPlayer);
+            System.out.println("\nTurn: " + currentPlayer);
             System.out.print("Enter your move (e.g., E2 E4) or 'quit' to exit: ");
 
             String fromInput = scanner.next();
@@ -63,15 +67,24 @@ public class Game {
             try {
                 Position from = parsePosition(fromInput);
                 Position to = parsePosition(toInput);
-				
-				Piece piece = board.getPiece(from);
-				if (!piece.getColor().equalsIgnoreCase(currentPlayer.getColor())) {
-					System.out.println("⚠️ You can only move your own pieces.");
-					continue;
-				}
+
+                Piece piece = board.getPiece(from);
+                if (piece == null) {
+                    System.out.println("⚠️ No piece at that square.");
+                    continue;
+                }
+
+                // ✅ Enforce correct turn color
+                if (piece.getColor() != currentPlayer.getColor()) {
+                    System.out.println("⚠️ You can only move your own pieces.");
+                    continue;
+                }
 
                 board.movePiece(from, to);
                 board.display();
+
+                printPlayerPieces(); // 🧪 optional debug after each move
+
                 switchTurn();
             } catch (IllegalArgumentException e) {
                 System.out.println("⚠️ Invalid move: " + e.getMessage());
@@ -83,9 +96,8 @@ public class Game {
 
     /**
      * Converts chess notation like "E2" into a Position object.
-     *
-     * @param input The chess coordinate as a String
-     * @return Position representing the row and column
+     * @param input user input in chess coordinates
+     * @return Position with 0–7 row/col indices
      */
     private Position parsePosition(String input) {
         input = input.toUpperCase().trim();
@@ -94,7 +106,6 @@ public class Game {
 
         char file = input.charAt(0);
         int col = file - 'A';
-
         int rank = Character.getNumericValue(input.charAt(1));
         int row = 8 - rank;
 
@@ -105,7 +116,7 @@ public class Game {
     }
 
     /**
-     * Switches the current player's turn.
+     * Switches the turn to the other player.
      */
     private void switchTurn() {
         currentPlayer = (currentPlayer == whitePlayer) ? blackPlayer : whitePlayer;
@@ -115,6 +126,19 @@ public class Game {
      * Ends the game.
      */
     public void end() {
-        System.out.println("Game Over!");
+        System.out.println("\n🏁 Game Over!");
+    }
+
+    /**
+     * 🧪 Debug method: Prints current remaining pieces for both players.
+     */
+    private void printPlayerPieces() {
+        System.out.println("\nWhite Pieces (" + whitePlayer.getAvailablePieces().size() + "):");
+        whitePlayer.getAvailablePieces().forEach(p -> System.out.print(p.getClass().getSimpleName() + " "));
+        System.out.println();
+
+        System.out.println("Black Pieces (" + blackPlayer.getAvailablePieces().size() + "):");
+        blackPlayer.getAvailablePieces().forEach(p -> System.out.print(p.getClass().getSimpleName() + " "));
+        System.out.println("\n");
     }
 }

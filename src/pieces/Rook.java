@@ -1,6 +1,9 @@
 package pieces;
 
-import board.Position;
+import utils.Color;
+import board.Board;
+import position.Position;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -8,43 +11,50 @@ import java.util.List;
  * Represents a Rook chess piece.
  */
 public class Rook extends Piece {
-	/**
-	 * Constructs a Rook piece with a given color and position.
-	 *
-	 * @param color "white" or "black"
-	 * @param position current position of the Rook on the board
-	 */
-	public Rook(String color, Position position) {
+
+	public Rook(Color color, Position position) {
 		super(color, position);
 	}
-	
-	/**
-	 * Returns all possible moves for the Rook from its current position.
-	 * A Rook can move horizontally or vertically as far as it wants
-	 * (assuming no obstacles and is within the board).
-	 *
-	 * @return list of possible positions the Rook can move to
-	 */
+
 	@Override
-	public List<Position> possibleMoves() {
-		List<Position> moves = new ArrayList<Position>();
+	public List<Position> possibleMoves(Board board) {
+		List<Position> moves = new ArrayList<>();
 		int row = position.getRow();
 		int col = position.getCol();
-		
-		//Vertical moves
-		for(int i = 0; i < 8; i++) {
-			if(i != row) {
-				moves.add(new Position(i, col));
+
+		// Four directions: up, down, left, right
+		int[][] directions = {
+				{-1, 0}, // up
+				{1, 0},  // down
+				{0, -1}, // left
+				{0, 1}   // right
+		};
+
+		for (int[] dir : directions) {
+			int r = row + dir[0];
+			int c = col + dir[1];
+
+			while (isInBounds(r, c)) {
+				Position nextPos = new Position(r, c);
+				Piece occupying = board.getPiece(nextPos);
+
+				if (occupying == null) {
+					// Empty square — valid move
+					moves.add(nextPos);
+				} else {
+					// If there's a piece of the opposite color, capture allowed
+					if (occupying.getColor() != this.color) {
+						moves.add(nextPos);
+					}
+					// Stop searching further in this direction
+					break;
+				}
+
+				r += dir[0];
+				c += dir[1];
 			}
 		}
-		
-		//Horizontal moves
-		for(int i = 0; i < 8; i++) {
-			if(i != col) {
-				moves.add(new Position(row, i));
-			}
-		}
-		
+
 		return moves;
 	}
 }

@@ -1,49 +1,58 @@
 package game;
 
+import utils.Color;
+import pieces.Piece;
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * The Player class represents a chess player.
- * Each player has a name and a color ("white" or "black").
- *
- * Phase 1: Simple data holder for player information.
- * Future phases: Could track captured pieces, score, or move history.
+ * Each player has a name and a color (WHITE or BLACK).
  */
 public class Player {
+
     /** The player's name. */
     private String name;
 
-    /** The player's color ("white" or "black"). */
-    private String color;
+    /** The player's color. */
+    private Color color;
+
+    /** List of pieces this player currently has on the board. */
+    private List<Piece> availablePieces;
 
     /**
      * Constructs a Player with the given name and color.
-     * @param name the name of the player
-     * @param color the color ("white" or "black") this player controls
+     * @param name  the name of the player
+     * @param color the color (WHITE or BLACK) this player controls
      */
-    public Player(String name, String color) {
+    public Player(String name, Color color) {
         this.name = name;
         this.color = color;
+        this.availablePieces = new ArrayList<>();
     }
 
-    /**
-     * Returns the player's name.
-     * @return the name of the player
-     */
     public String getName() {
         return name;
     }
 
-    /**
-     * Returns the player's color.
-     * @return the color ("white" or "black")
-     */
-    public String getColor() {
+    public Color getColor() {
         return color;
     }
 
-    /**
-     * Returns a string representation of the player.
-     * @return formatted string with name and color
-     */
+    public List<Piece> getAvailablePieces() {
+        return availablePieces;
+    }
+
+    /** Add a piece to the player's collection */
+    public void addPiece(Piece piece) {
+        availablePieces.add(piece);
+    }
+
+    /** Remove a piece (e.g., when it's captured) */
+    public void removePiece(Piece piece) {
+        availablePieces.remove(piece);
+    }
+
     @Override
     public String toString() {
         return name + " (" + color + ")";
