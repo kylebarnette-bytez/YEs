@@ -65,10 +65,6 @@ public class Game {
                 Position to = parsePosition(toInput);
 				
 				Piece piece = board.getPiece(from);
-				if (piece == null) {
-					System.out.println("⚠️ No piece at the source square.");
-					continue;
-				}
 				if (!piece.getColor().equalsIgnoreCase(currentPlayer.getColor())) {
 					System.out.println("⚠️ You can only move your own pieces.");
 					continue;

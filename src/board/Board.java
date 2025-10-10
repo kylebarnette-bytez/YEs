@@ -118,7 +118,10 @@ public class Board {
             return;
         }
 		
-		//TODO: use validateMove() to validate move
+		if(!validateMove(from, to)) {
+			throw new IllegalArgumentException("Move violates movement rules.");
+			return;
+		}
 
         // ✅ Move the piece
         squares[to.getRow()][to.getCol()] = moving;
