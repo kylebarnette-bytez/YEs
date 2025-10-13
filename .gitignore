@@ -1,24 +1,24 @@
-# 🧹 IntelliJ IDEA project files
-.idea/
-*.iml
-
-# 🏗️ Build output directories
-out/
-build/
-target/
-
-# 🍏 macOS system files
-.DS_Store
-
-# 📦 Logs and temp files
-*.log
-*.class
-*.tmp
-*.swp
-
-# 🚫 Node modules or external libs (if you ever use them)
-node_modules/
-
-# ✅ EXCEPTIONS (Javadoc folder)
-# Allow pushing generated Javadoc in YEs folder
-!YEs/
+## 🧹 IntelliJ IDEA project files
+#.idea/
+#*.iml
+#
+## 🏗️ Build output directories
+#out/
+#build/
+#target/
+#
+## 🍏 macOS system files
+#.DS_Store
+#
+## 📦 Logs and temp files
+#*.log
+#*.class
+#*.tmp
+#*.swp
+#
+## 🚫 Node modules or external libs (if you ever use them)
+#node_modules/
+#
+## ✅ EXCEPTIONS (Javadoc folder)
+## Allow pushing generated Javadoc in YEs folder
+#!YEs/
