@@ -19,7 +19,7 @@ import java.util.List;
  * </ul>
  *
  * The king cannot land on a square occupied by its own color.
- * In future phases, castling logic could also be added here.
+ * Additionally, the king cannot move into check.
  *
  * <p>Examples of movement:
  * <pre>
@@ -46,6 +46,7 @@ public class King extends Piece {
 	 * <ul>
 	 *   <li>the target square is inside the board, and</li>
 	 *   <li>the target square is empty or occupied by an opponent’s piece</li>
+	 *   <li>the king does not move into check</li>
 	 * </ul>
 	 *
 	 * @param board the current {@link Board} state
@@ -58,20 +59,28 @@ public class King extends Piece {
 		int row = position.getRow();
 		int col = position.getCol();
 
-		// 8 surrounding squares (top-left, top, top-right, left, right, bottom-left, bottom, bottom-right)
-		int[] rowOffsets = {-1, -1, -1,  0, 0,  1, 1, 1};
-		int[] colOffsets = {-1,  0,  1, -1, 1, -1, 0, 1};
+		// 8 surrounding squares relative to the king
+		int[] rowOffsets = {-1, -1, -1, 0, 0, 1, 1, 1};
+		int[] colOffsets = {-1, 0, 1, -1, 1, -1, 0, 1};
 
 		for (int i = 0; i < 8; i++) {
 			int newRow = row + rowOffsets[i];
 			int newCol = col + colOffsets[i];
 
-			if (isInBounds(newRow, newCol)) {
-				Position newPos = new Position(newRow, newCol);
-				Piece pieceAtDestination = board.getPiece(newPos);
+			if (!isInBounds(newRow, newCol)) continue; // skip out-of-bounds squares
 
-				// ✅ Only allow empty squares or captures
-				if (pieceAtDestination == null || pieceAtDestination.getColor() != this.color) {
+			Position newPos = new Position(newRow, newCol);
+			Piece pieceAtDestination = board.getPiece(newPos);
+
+			// Only allow moving into empty squares or capturing opponent pieces
+			if (pieceAtDestination == null || pieceAtDestination.getColor() != this.color) {
+				// 👑 only check for check if this is NOT a simulation board
+				if (!board.isSimulation()) {
+					if (!board.movePutsPlayerInCheck(this.position, newPos, this.color)) {
+						moves.add(newPos);
+					}
+				} else {
+					// simulation board: don't recursively check again
 					moves.add(newPos);
 				}
 			}

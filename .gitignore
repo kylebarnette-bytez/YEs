@@ -1,55 +1,24 @@
-
-
-
-### IntelliJ IDEA ###
+# 🧹 IntelliJ IDEA project files
 .idea/
 *.iml
+
+# 🏗️ Build output directories
 out/
-!**/src/main/**/out/
-!**/src/test/**/out/
+build/
+target/
 
-### Eclipse ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-bin/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-
-### VS Code ###
-.vscode/
-
-### Mac OS ###
+# 🍏 macOS system files
 .DS_Store
 
-### Java ###
-*.class
+# 📦 Logs and temp files
 *.log
-*.jar
-*.war
-*.ear
-
-# Generated files
-target/
-build/
-
-# Backup files
-*~
+*.class
+*.tmp
 *.swp
-*.swo
 
+# 🚫 Node modules or external libs (if you ever use them)
+node_modules/
 
-#Allow Javadocs
+# ✅ EXCEPTIONS (Javadoc folder)
+# Allow pushing generated Javadoc in YEs folder
 !YEs/
-

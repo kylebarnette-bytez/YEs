@@ -24,6 +24,10 @@ import java.util.function.Consumer;
  */
 public class Board {
 
+	/** Flag indicating whether this board is used for simulation (e.g. check detection) */
+	private boolean simulationMode = false;
+
+
 	/** 8x8 array representing the board. Each element is a Piece or null for an empty square. */
 	private Piece[][] board = new Piece[8][8];
 
@@ -55,6 +59,16 @@ public class Board {
 	}
 
 	/**
+	 * Private constructor used internally for board copying
+	 * without initializing the starting chess setup.
+	 */
+	private Board(boolean skipInit) {
+		if (!skipInit) {
+			initializeBoard();
+		}
+	}
+
+	/**
 	 * Initializes the board with standard chess starting positions
 	 * and registers pieces to their respective players.
 	 */
@@ -66,14 +80,16 @@ public class Board {
 			}
 		}
 
-		// Helper lambda to register pieces with the correct player
 		Consumer<Piece> registerPiece = piece -> {
-			if (piece.getColor() == Color.WHITE) {
-				whitePlayer.addPiece(piece);
-			} else {
-				blackPlayer.addPiece(piece);
+			if (whitePlayer != null && blackPlayer != null) {  // only register on real game board
+				if (piece.getColor() == Color.WHITE) {
+					whitePlayer.addPiece(piece);
+				} else {
+					blackPlayer.addPiece(piece);
+				}
 			}
 		};
+
 
 		// 🟡 Place Pawns
 		for (int col = 0; col < 8; col++) {
@@ -169,12 +185,13 @@ public class Board {
 
 	/**
 	 * Moves a piece from one square to another.
-	 * If {@code verbose} is true, prints messages for invalid moves.
-	 * Handles captures and updates the player’s piece lists.
+	 * If {@code verbose} is true, validates the move and prints messages for invalid moves.
+	 * Handles captures, updates the board state, and updates player piece lists
+	 * only on real game boards (not simulation boards used for check detection).
 	 *
 	 * @param from    source square
 	 * @param to      target square
-	 * @param verbose whether to print errors
+	 * @param verbose whether to validate and throw for illegal moves
 	 */
 	public void movePiece(Position from, Position to, boolean verbose) {
 		Piece moving = board[from.getRow()][from.getCol()];
@@ -187,22 +204,23 @@ public class Board {
 			return;
 		}
 
-		// Validate legal move
-		if (!validateMove(from, to)) {
-			if (verbose) {
+		// Validate legal move (only in real game, not simulation)
+		if (verbose) {
+			if (!validateMove(from, to)) {
 				throw new IllegalArgumentException("Move violates movement rules.");
-			} else {
-				return;
 			}
 		}
 
 		// Handle capture if target square is occupied
 		Piece dest = board[to.getRow()][to.getCol()];
 		if (dest != null) {
-			if (dest.getColor() == Color.WHITE) {
-				whitePlayer.removePiece(dest);
-			} else {
-				blackPlayer.removePiece(dest);
+			// ✅ Only update player lists on the real board
+			if (whitePlayer != null && blackPlayer != null) {
+				if (dest.getColor() == Color.WHITE) {
+					whitePlayer.removePiece(dest);
+				} else {
+					blackPlayer.removePiece(dest);
+				}
 			}
 		}
 
@@ -212,15 +230,14 @@ public class Board {
 		board[from.getRow()][from.getCol()] = null;
 	}
 
+
 	/**
-	 * Moves a piece with verbose errors enabled by default.
-	 *
-	 * @param from source square
-	 * @param to   target square
+	 * Convenience overload: moves a piece with validation and verbose errors.
 	 */
 	public void movePiece(Position from, Position to) {
 		movePiece(from, to, true);
 	}
+
 
 	/**
 	 * Prints a text-based rendering of the board to the console.
@@ -348,18 +365,80 @@ public class Board {
 	}
 
 	/**
+	 * Checks whether making a specific move would put the player in check.
+	 *
+	 * @param from the starting position
+	 * @param to the destination position
+	 * @param playerColor the color of the player making the move
+	 * @return true if the move results in the player being in check, false otherwise
+	 */
+	/**
+	 * Checks whether making a move from one position to another
+	 * would leave the player of the given color in check.
+	 *
+	 * This is used to:
+	 * - Prevent the king from moving into check
+	 * - Filter out illegal moves in check situations
+	 * - Validate blocking moves or captures to escape check
+	 *
+	 * @param from  the source position of the move
+	 * @param to    the target position of the move
+	 * @param color the color of the player making the move
+	 * @return true if the move would result in the player being in check
+	 */
+	public boolean movePutsPlayerInCheck(Position from, Position to, Color color) {
+		Board temp = this.copy();            // Create a safe clone of the board
+		Piece moving = temp.getPiece(from);  // Get the piece being moved
+		if (moving == null) return false;
+
+		try {
+			// Simulate the move without validating (to avoid recursion)
+			temp.movePiece(from, to, false);
+		} catch (IllegalArgumentException e) {
+			// If the move is illegal for other reasons, it can't cause check
+			return false;
+		}
+
+		// After simulating the move, check if this color is in check
+		return temp.isCheck(color);
+	}
+
+	public boolean isSimulation() {
+		return simulationMode;
+	}
+
+	/**
 	 * Creates a shallow copy of the current board.
 	 * Used for check/checkmate simulations without altering real state.
 	 *
 	 * @return new Board instance with the same piece layout
 	 */
 	public Board copy() {
-		Board newBoard = new Board(whitePlayer, blackPlayer);
+		Board newBoard = new Board(true);  // no initialization, clean board
+		newBoard.simulationMode = true;    // 🧠 mark this board as simulation
+
 		for (int r = 0; r < 8; r++) {
 			for (int c = 0; c < 8; c++) {
-				newBoard.board[r][c] = this.board[r][c];
+				Piece original = this.board[r][c];
+				if (original != null) {
+					Position newPos = new Position(r, c);
+					Piece clone = clonePiece(original, newPos);
+					newBoard.board[r][c] = clone;
+				}
 			}
 		}
 		return newBoard;
 	}
+
+
+	private Piece clonePiece(Piece piece, Position newPos) {
+		if (piece instanceof King) return new King(piece.getColor(), newPos);
+		if (piece instanceof Queen) return new Queen(piece.getColor(), newPos);
+		if (piece instanceof Rook) return new Rook(piece.getColor(), newPos);
+		if (piece instanceof Bishop) return new Bishop(piece.getColor(), newPos);
+		if (piece instanceof Knight) return new Knight(piece.getColor(), newPos);
+		if (piece instanceof Pawn) return new Pawn(piece.getColor(), newPos);
+		throw new IllegalArgumentException("Unknown piece type");
+	}
+
 }

@@ -106,6 +106,7 @@ public class Game {
                     continue;
                 }
 
+
                 // Execute the move
                 board.movePiece(from, to);
                 board.display();
