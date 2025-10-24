@@ -2,6 +2,7 @@ package gui;
 
 import javax.swing.*;
 import java.awt.*;
+import gui.*;
 
 public class ChessGUI extends JFrame {
 
