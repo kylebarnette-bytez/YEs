@@ -1,5 +1,7 @@
 package gui;
 
+import java.util.Stack; // KYLE: added for undo feature
+
 import javax.swing.*;
 import java.awt.*;
 import gui.*;
@@ -10,7 +12,14 @@ public class BoardPanel extends JPanel {
     private final SquarePanel[][] squares = new SquarePanel[BOARD_SIZE][BOARD_SIZE];
     private SquarePanel selectedSquare = null;
 
-    public BoardPanel() {
+    // KYLE: added for extra features
+    private boolean whiteTurn = true;
+    private final Stack<MoveRecord> moveHistory = new Stack<>();
+    private ChessGUI parentGUI; // reference to parent for popup + status updates
+
+
+    public BoardPanel(ChessGUI parent) { // KYLE: added parent for GUI communication
+        this.parentGUI = parent;
         setLayout(new GridLayout(BOARD_SIZE, BOARD_SIZE));
         initializeBoard();
         initializePieces();
@@ -56,7 +65,7 @@ public class BoardPanel extends JPanel {
 
     public void handleSquareClick(SquarePanel clicked) {
         if (selectedSquare == null) {
-            if (clicked.hasPiece()) {
+            if (clicked.hasPiece() && isCorrectTurn(clicked.getPieceKey())) {
                 selectedSquare = clicked;
                 clicked.setHighlighted(true);
             }
@@ -69,10 +78,90 @@ public class BoardPanel extends JPanel {
             return;
         }
 
+        // KYLE: track move history for Undo
+        moveHistory.push(new MoveRecord(selectedSquare, clicked));
+
+// KYLE: check if King captured
+        if (clicked.hasPiece() && clicked.getPieceKey().contains("KING")) {
+            String winner = whiteTurn ? "White" : "Black";
+            clicked.setPiece(selectedSquare.getPieceKey());
+            selectedSquare.clearPiece();
+            if (parentGUI != null) parentGUI.showEndgameMessage(winner);
+            return;
+        }
+
         String movingPiece = selectedSquare.getPieceKey();
         clicked.setPiece(movingPiece);
+
         selectedSquare.clearPiece();
         selectedSquare.setHighlighted(false);
         selectedSquare = null;
+        // KYLE: switch turns and update label
+        whiteTurn = !whiteTurn;
+        if (parentGUI != null)
+            parentGUI.updateStatus(whiteTurn ? "White's Turn" : "Black's Turn");
+
     }
+    // KYLE: ensures correct player moves
+    private boolean isCorrectTurn(String pieceKey) {
+        return (whiteTurn && pieceKey.startsWith("WHITE")) ||
+                (!whiteTurn && pieceKey.startsWith("BLACK"));
+    }
+
+
+    // KYLE: Reset board for "New Game"
+    // KYLE: Reset the full board properly
+    public void resetBoard() {
+        // Clear every square before re-populating
+        for (SquarePanel[] row : squares) {
+            for (SquarePanel s : row) {
+                s.clearPiece();        // remove any piece icon
+                s.setHighlighted(false); // remove yellow border if selected
+            }
+        }
+
+        // Re-add pieces in starting positions
+        initializePieces();
+
+        whiteTurn = true;
+        if (parentGUI != null)
+            parentGUI.updateStatus("White's Turn");
+
+        // Force a redraw to clear ghost icons
+        revalidate();
+        repaint();
+    }
+
+
+    // KYLE: Undo last move
+    public void undoLastMove() {
+        if (!moveHistory.isEmpty()) {
+            MoveRecord last = moveHistory.pop();
+            last.undo();
+            whiteTurn = !whiteTurn;
+            if (parentGUI != null)
+                parentGUI.updateStatus(whiteTurn ? "White's Turn" : "Black's Turn");
+        }
+    }
+
+    // KYLE: track each move for Undo
+    private static class MoveRecord {
+        private final SquarePanel from, to;
+        private final String capturedPiece;
+
+        MoveRecord(SquarePanel from, SquarePanel to) {
+            this.from = from;
+            this.to = to;
+            this.capturedPiece = to.getPieceKey();
+        }
+
+        void undo() {
+            from.setPiece(to.getPieceKey());
+            if (capturedPiece != null)
+                to.setPiece(capturedPiece);
+            else
+                to.clearPiece();
+        }
+    }
+
 }
