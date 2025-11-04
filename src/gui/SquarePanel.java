@@ -38,6 +38,14 @@ public class SquarePanel extends JPanel {
             }
         });
     }
+	
+	public int getRow() {
+		return row;
+	}
+
+	public int getCol() {
+		return col;
+	}
 
     public void setPiece(String pieceKey) {
         this.pieceKey = pieceKey;

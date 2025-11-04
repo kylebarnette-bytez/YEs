@@ -1,7 +1,9 @@
 package gui;
 
 import java.util.Stack; // KYLE: added for undo feature
-
+import java.util.ArrayList;
+import java.util.List;
+import java.io.*;
 import javax.swing.*;
 import java.awt.*;
 import gui.*;
@@ -81,7 +83,7 @@ public class BoardPanel extends JPanel {
         // KYLE: track move history for Undo
         moveHistory.push(new MoveRecord(selectedSquare, clicked));
 
-// KYLE: check if King captured
+		// KYLE: check if King captured
         if (clicked.hasPiece() && clicked.getPieceKey().contains("KING")) {
             String winner = whiteTurn ? "White" : "Black";
             clicked.setPiece(selectedSquare.getPieceKey());
@@ -131,7 +133,81 @@ public class BoardPanel extends JPanel {
         revalidate();
         repaint();
     }
+	
+	// --- SAVE GAME ---
+	public void saveGame() {
+		JFileChooser fileChooser = new JFileChooser();
+		int option = fileChooser.showSaveDialog(this);
+		if (option != JFileChooser.APPROVE_OPTION) return;
 
+		File file = fileChooser.getSelectedFile();
+
+		try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(file))) {
+			GameState state = new GameState();
+
+			// Save board state
+			for (int row = 0; row < BOARD_SIZE; row++) {
+				for (int col = 0; col < BOARD_SIZE; col++) {
+					state.board[row][col] = squares[row][col].getPieceKey();
+				}
+			}
+
+			// Save turn info
+			state.whiteTurn = this.whiteTurn;
+
+			// Save move history (just store "from" and "to" coordinates)
+			for (MoveRecord m : moveHistory) {
+				state.moveHistory.add(new GameState.MoveData(m.fromRow, m.fromCol, m.toRow, m.toCol, m.capturedPiece));
+			}
+
+			out.writeObject(state);
+			JOptionPane.showMessageDialog(this, "Game saved successfully!", "Save", JOptionPane.INFORMATION_MESSAGE);
+		} catch (IOException e) {
+			JOptionPane.showMessageDialog(this, "Error saving game: "+e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+		}
+	}
+
+	// --- LOAD GAME ---
+	public void loadGame() {
+		JFileChooser fileChooser = new JFileChooser();
+		int option = fileChooser.showOpenDialog(this);
+		if (option != JFileChooser.APPROVE_OPTION) return;
+
+		File file = fileChooser.getSelectedFile();
+
+		try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(file))) {
+			GameState state = (GameState) in.readObject();
+
+			// Restore board
+			for (int row = 0; row < BOARD_SIZE; row++) {
+				for (int col = 0; col < BOARD_SIZE; col++) {
+					String piece = state.board[row][col];
+					squares[row][col].setPiece(piece);
+				}
+			}
+
+			// Restore turn
+			this.whiteTurn = state.whiteTurn;
+			if (parentGUI != null)
+				parentGUI.updateStatus(whiteTurn ? "White's Turn" : "Black's Turn");
+
+			// Restore move history
+			moveHistory.clear();
+			for (GameState.MoveData md : state.moveHistory) {
+				SquarePanel from = squares[md.fromRow][md.fromCol];
+				SquarePanel to = squares[md.toRow][md.toCol];
+				moveHistory.add(new MoveRecord(from, to, md.capturedPiece));
+			}
+
+			revalidate();
+			repaint();
+
+			JOptionPane.showMessageDialog(this, "Game loaded successfully!", "Load", JOptionPane.INFORMATION_MESSAGE);
+
+		} catch (IOException | ClassNotFoundException e) {
+			JOptionPane.showMessageDialog(this, "Error loading game: "+e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+		}
+	}
 
     // KYLE: Undo last move
     public void undoLastMove() {
@@ -148,11 +224,21 @@ public class BoardPanel extends JPanel {
     private static class MoveRecord {
         private final SquarePanel from, to;
         private final String capturedPiece;
+		private final int fromRow, fromCol, toRow, toCol;
 
         MoveRecord(SquarePanel from, SquarePanel to) {
+            this(from, to, to.getPieceKey());
+        }
+		
+		//Overloaded method
+		MoveRecord(SquarePanel from, SquarePanel to, String capturedPiece) {
             this.from = from;
             this.to = to;
-            this.capturedPiece = to.getPieceKey();
+            this.capturedPiece = capturedPiece;
+			this.fromRow = from.getRow();
+			this.fromCol = from.getCol();
+			this.toRow = to.getRow();
+			this.toCol = to.getCol();
         }
 
         void undo() {
@@ -163,5 +249,24 @@ public class BoardPanel extends JPanel {
                 to.clearPiece();
         }
     }
+	
+	//Save file class
+	private static class GameState implements Serializable {
+		String[][] board = new String[BOARD_SIZE][BOARD_SIZE];
+		boolean whiteTurn;
+		List<MoveData> moveHistory = new ArrayList<>();
+
+		static class MoveData implements Serializable {
+			int fromRow, fromCol, toRow, toCol;
+			String capturedPiece;
+			MoveData(int fromRow, int fromCol, int toRow, int toCol, String capturedPiece) {
+				this.fromRow = fromRow;
+				this.fromCol = fromCol;
+				this.toRow = toRow;
+				this.toCol = toCol;
+				this.capturedPiece = capturedPiece;
+			}
+		}
+	}
 
 }

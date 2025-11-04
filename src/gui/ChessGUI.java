@@ -29,15 +29,16 @@ public class ChessGUI extends JFrame{
         controlPanel.setLayout(new GridLayout(5, 1, 10, 10));
         controlPanel.setBorder(BorderFactory.createEmptyBorder(20, 10, 20, 10));
 
-        JButton newGameBtn = new JButton("New Game");
+		//New Game button implemented in menu bar
+        //JButton newGameBtn = new JButton("New Game"); 
         JButton undoBtn = new JButton("Undo Move");
         JButton exitBtn = new JButton("Exit");
 
-        newGameBtn.addActionListener(e -> boardPanel.resetBoard());
+        //newGameBtn.addActionListener(e -> boardPanel.resetBoard());
         undoBtn.addActionListener(e -> boardPanel.undoLastMove());
         exitBtn.addActionListener(e -> System.exit(0));
 
-        controlPanel.add(newGameBtn);
+        //controlPanel.add(newGameBtn);
         controlPanel.add(undoBtn);
         controlPanel.add(exitBtn);
 
@@ -48,6 +49,25 @@ public class ChessGUI extends JFrame{
         statusLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
         statusLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
         add(statusLabel, BorderLayout.SOUTH);
+		
+		// --- Menu Bar ---
+		JMenuBar menuBar = new JMenuBar();
+		JMenu gameMenu = new JMenu("Game");
+
+		JMenuItem newGameItem = new JMenuItem("New Game");
+		JMenuItem saveGameItem = new JMenuItem("Save Game");
+		JMenuItem loadGameItem = new JMenuItem("Load Game");
+
+		newGameItem.addActionListener(e -> boardPanel.resetBoard());
+		saveGameItem.addActionListener(e -> boardPanel.saveGame());
+		loadGameItem.addActionListener(e -> boardPanel.loadGame());
+
+		gameMenu.add(newGameItem);
+		gameMenu.add(saveGameItem);
+		gameMenu.add(loadGameItem);
+
+		menuBar.add(gameMenu);
+		setJMenuBar(menuBar);
 
         setLocationRelativeTo(null);
         setVisible(true);
@@ -69,20 +89,3 @@ public class ChessGUI extends JFrame{
         SwingUtilities.invokeLater(ChessGUI::new);
     }
 }
-//public class ChessGUI extends JFrame {
-//
-//    private BoardPanel boardPanel;
-//
-//    public ChessGUI() {
-//        setTitle("Chess Game");
-//        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-//        setLayout(new BorderLayout());
-//        setSize(800, 800);
-//
-//        boardPanel = new BoardPanel();
-//        add(boardPanel, BorderLayout.CENTER);
-//
-//        setLocationRelativeTo(null); // center window
-//        setVisible(true);
-//    }
-//}
