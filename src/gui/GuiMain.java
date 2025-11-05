@@ -3,19 +3,17 @@ package gui;
 import javax.swing.SwingUtilities;
 
 /**
- * GuiMain.java
- * ------------------------------------------------------------
- * A separate entry point used solely for testing GUI components.
- * This allows GUI development without interfering with
- * the core game logic in Main.java.
- *
- * Run this file to launch the GUI without starting the game loop.
- * ------------------------------------------------------------
+ * Standalone entry point for testing or launching the Chess GUI.
+ * Runs independently from any game logic or backend processes.
  */
 public class GuiMain {
 
+    /**
+     * Launches the Chess GUI using the Swing event dispatch thread.
+     *
+     * @param args command-line arguments (not used)
+     */
     public static void main(String[] args) {
-        // Use SwingUtilities to ensure thread safety
         SwingUtilities.invokeLater(() -> {
             ChessGUI gui = new ChessGUI();
             gui.setVisible(true);

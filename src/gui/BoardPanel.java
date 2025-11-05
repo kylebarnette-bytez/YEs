@@ -1,42 +1,59 @@
 package gui;
 
-import java.util.Stack; // KYLE: added for undo feature
+import java.util.Stack;
 import java.util.ArrayList;
 import java.util.List;
 import java.io.*;
 import javax.swing.*;
 import java.awt.*;
-import gui.*;
 
+/**
+ * Represents the main chessboard panel responsible for rendering the 8×8 grid,
+ * handling user interactions, piece movement, and communication with the GUI
+ * and game history components.
+ */
 public class BoardPanel extends JPanel {
 
     private static final int BOARD_SIZE = 8;
     private final SquarePanel[][] squares = new SquarePanel[BOARD_SIZE][BOARD_SIZE];
     private SquarePanel selectedSquare = null;
-
-    // KYLE: added for extra features
     private boolean whiteTurn = true;
     private final Stack<MoveRecord> moveHistory = new Stack<>();
-    private ChessGUI parentGUI; // reference to parent for popup + status updates
-    // --- added for GameHistoryPanel ---
+    private ChessGUI parentGUI;
     private GameHistoryPanel historyPanel;
+
+    /**
+     * Links this board to a {@link GameHistoryPanel} for displaying move history.
+     *
+     * @param panel the history panel to associate
+     */
     public void setHistoryPanel(GameHistoryPanel panel) {
         this.historyPanel = panel;
     }
+
+    /**
+     * Indicates whether it is currently White's turn.
+     *
+     * @return {@code true} if White's turn; {@code false} if Black's turn
+     */
     public boolean isWhiteTurn() {
         return whiteTurn;
     }
 
-
-
-
-    public BoardPanel(ChessGUI parent) { // KYLE: added parent for GUI communication
+    /**
+     * Creates a new {@code BoardPanel} with a parent GUI reference.
+     * Initializes the layout, board squares, and starting pieces.
+     *
+     * @param parent the parent {@link ChessGUI} instance
+     */
+    public BoardPanel(ChessGUI parent) {
         this.parentGUI = parent;
         setLayout(new GridLayout(BOARD_SIZE, BOARD_SIZE));
         initializeBoard();
         initializePieces();
     }
 
+    /** Initializes all 64 squares of the chessboard grid. */
     private void initializeBoard() {
         for (int row = 0; row < BOARD_SIZE; row++) {
             for (int col = 0; col < BOARD_SIZE; col++) {
@@ -47,8 +64,8 @@ public class BoardPanel extends JPanel {
         }
     }
 
+    /** Places all chess pieces in their default starting positions. */
     private void initializePieces() {
-        // Black pieces
         for (int col = 0; col < BOARD_SIZE; col++) {
             squares[1][col].setPiece("BLACK_PAWN");
         }
@@ -61,7 +78,6 @@ public class BoardPanel extends JPanel {
         squares[0][3].setPiece("BLACK_QUEEN");
         squares[0][4].setPiece("BLACK_KING");
 
-        // White pieces
         for (int col = 0; col < BOARD_SIZE; col++) {
             squares[6][col].setPiece("WHITE_PAWN");
         }
@@ -75,35 +91,36 @@ public class BoardPanel extends JPanel {
         squares[7][4].setPiece("WHITE_KING");
     }
 
+    /**
+     * Handles user clicks on a board square. Determines whether the action
+     * is a piece selection, move attempt, or deselection.
+     *
+     * @param clicked the square that was clicked
+     */
     public void handleSquareClick(SquarePanel clicked) {
-
-        //  Selecting a piece
         if (selectedSquare == null) {
             if (clicked.hasPiece() && isCorrectTurn(clicked.getPieceKey())) {
-                clearHighlights(); // remove any old highlights first
+                clearHighlights();
                 selectedSquare = clicked;
                 if (parentGUI != null) {
-                    parentGUI.flashMessage("Showing possible moves for " + clicked.getPieceKey().replace("_", " "));
+                    parentGUI.flashMessage("Showing possible moves for " +
+                            clicked.getPieceKey().replace("_", " "));
                 }
-
-                showPossibleMoves(clicked); // 🔥 highlight all possible moves
-                clicked.setHighlighted(true); // highlight selected piece
+                showPossibleMoves(clicked);
+                clicked.setHighlighted(true);
             }
             return;
         }
 
-        // 2️⃣ — Clicking the same square again cancels selection
         if (clicked == selectedSquare) {
-            clearHighlights(); // 🧹 remove move highlights
+            clearHighlights();
             selectedSquare.setHighlighted(false);
             selectedSquare = null;
             return;
         }
 
-        // 3️⃣ — Otherwise, it’s a move attempt
         moveHistory.push(new MoveRecord(selectedSquare, clicked));
 
-        // --- added for GameHistoryPanel ---
         String movingPiece = selectedSquare.getPieceKey();
         String capturedPiece = clicked.getPieceKey();
         String from = "(" + selectedSquare.getRow() + "," + selectedSquare.getCol() + ")";
@@ -117,7 +134,6 @@ public class BoardPanel extends JPanel {
             }
         }
 
-        // 4️⃣ — Check for King capture (endgame)
         if (clicked.hasPiece() && clicked.getPieceKey().contains("KING")) {
             String winner = whiteTurn ? "White" : "Black";
             clicked.setPiece(selectedSquare.getPieceKey());
@@ -126,34 +142,37 @@ public class BoardPanel extends JPanel {
             return;
         }
 
-        // 5️⃣ — Perform the actual move
         clicked.setPiece(movingPiece);
         selectedSquare.clearPiece();
-
-        // 6️⃣ — Clean up highlights and selection
-        clearHighlights(); // remove possible-move highlights
+        clearHighlights();
         selectedSquare.setHighlighted(false);
         selectedSquare = null;
 
-        // 7️⃣ — Switch turn and update status label
         whiteTurn = !whiteTurn;
         if (parentGUI != null) {
             parentGUI.updateStatus(whiteTurn ? "White's Turn" : "Black's Turn");
-            parentGUI.switchTurnTimer(whiteTurn); // 👈 new method call
+            parentGUI.switchTurnTimer(whiteTurn);
         }
-
     }
 
-    // KYLE: ensures correct player moves
+    /**
+     * Determines whether the clicked piece belongs to the player whose turn it is.
+     *
+     * @param pieceKey the key representing the piece
+     * @return {@code true} if the turn matches the piece color, otherwise {@code false}
+     */
     private boolean isCorrectTurn(String pieceKey) {
         return (whiteTurn && pieceKey.startsWith("WHITE")) ||
-                (!whiteTurn && pieceKey.startsWith("BLACK"));
+               (!whiteTurn && pieceKey.startsWith("BLACK"));
     }
 
-    // --- Highlight Feature: Show possible moves for a selected piece ---
+    /**
+     * Highlights all legal moves for a given piece based on its type and position.
+     *
+     * @param fromSquare the square containing the selected piece
+     */
     public void showPossibleMoves(SquarePanel fromSquare) {
-        clearHighlights(); // Remove any old highlights first
-
+        clearHighlights();
         String piece = fromSquare.getPieceKey();
         if (piece == null || piece.isEmpty()) return;
 
@@ -161,51 +180,37 @@ public class BoardPanel extends JPanel {
         int col = fromSquare.getCol();
 
         if (piece.equals("WHITE_PAWN")) {
-            if (row > 0 && !squares[row - 1][col].hasPiece()) {
-                squares[row - 1][col].setHighlighted(true); // move forward
-            }
-            // capture diagonally
+            if (row > 0 && !squares[row - 1][col].hasPiece())
+                squares[row - 1][col].setHighlighted(true);
             if (row > 0 && col > 0 && squares[row - 1][col - 1].hasPiece() &&
-                    squares[row - 1][col - 1].getPieceKey().startsWith("BLACK"))
+                squares[row - 1][col - 1].getPieceKey().startsWith("BLACK"))
                 squares[row - 1][col - 1].setHighlighted(true);
             if (row > 0 && col < 7 && squares[row - 1][col + 1].hasPiece() &&
-                    squares[row - 1][col + 1].getPieceKey().startsWith("BLACK"))
+                squares[row - 1][col + 1].getPieceKey().startsWith("BLACK"))
                 squares[row - 1][col + 1].setHighlighted(true);
-        }
-
-        else if (piece.equals("BLACK_PAWN")) {
-            if (row < 7 && !squares[row + 1][col].hasPiece()) {
+        } else if (piece.equals("BLACK_PAWN")) {
+            if (row < 7 && !squares[row + 1][col].hasPiece())
                 squares[row + 1][col].setHighlighted(true);
-            }
-            // capture diagonally
             if (row < 7 && col > 0 && squares[row + 1][col - 1].hasPiece() &&
-                    squares[row + 1][col - 1].getPieceKey().startsWith("WHITE"))
+                squares[row + 1][col - 1].getPieceKey().startsWith("WHITE"))
                 squares[row + 1][col - 1].setHighlighted(true);
             if (row < 7 && col < 7 && squares[row + 1][col + 1].hasPiece() &&
-                    squares[row + 1][col + 1].getPieceKey().startsWith("WHITE"))
+                squares[row + 1][col + 1].getPieceKey().startsWith("WHITE"))
                 squares[row + 1][col + 1].setHighlighted(true);
-        }
-
-        else if (piece.endsWith("KNIGHT")) {
+        } else if (piece.endsWith("KNIGHT")) {
             int[][] moves = {{2,1},{1,2},{-1,2},{-2,1},{-2,-1},{-1,-2},{1,-2},{2,-1}};
             for (int[] m : moves) {
                 int r = row + m[0], c = col + m[1];
                 if (r >= 0 && r < 8 && c >= 0 && c < 8 && !isSameColor(r, c, piece))
                     squares[r][c].setHighlighted(true);
             }
-        }
-
-        else if (piece.endsWith("BISHOP") || piece.endsWith("QUEEN")) {
+        } else if (piece.endsWith("BISHOP") || piece.endsWith("QUEEN")) {
             int[][] dirs = {{1,1},{1,-1},{-1,1},{-1,-1}};
             slideMoves(row, col, dirs, piece);
-        }
-
-        else if (piece.endsWith("ROOK") || piece.endsWith("QUEEN")) {
+        } else if (piece.endsWith("ROOK") || piece.endsWith("QUEEN")) {
             int[][] dirs = {{1,0},{-1,0},{0,1},{0,-1}};
             slideMoves(row, col, dirs, piece);
-        }
-
-        else if (piece.endsWith("KING")) {
+        } else if (piece.endsWith("KING")) {
             for (int dr = -1; dr <= 1; dr++) {
                 for (int dc = -1; dc <= 1; dc++) {
                     if (dr == 0 && dc == 0) continue;
@@ -217,7 +222,14 @@ public class BoardPanel extends JPanel {
         }
     }
 
-    // Helper: Slide in given directions until blocked
+    /**
+     * Generates possible slide-type moves (used by rooks, bishops, and queens).
+     *
+     * @param row starting row
+     * @param col starting column
+     * @param dirs direction vectors
+     * @param piece the moving piece
+     */
     private void slideMoves(int row, int col, int[][] dirs, String piece) {
         for (int[] dir : dirs) {
             int r = row + dir[0], c = col + dir[1];
@@ -225,7 +237,7 @@ public class BoardPanel extends JPanel {
                 if (squares[r][c].hasPiece()) {
                     if (!isSameColor(r, c, piece))
                         squares[r][c].setHighlighted(true);
-                    break; // stop at first piece
+                    break;
                 }
                 squares[r][c].setHighlighted(true);
                 r += dir[0];
@@ -234,128 +246,129 @@ public class BoardPanel extends JPanel {
         }
     }
 
-    // Helper: check if target square has same color piece
+    /**
+     * Checks whether a target square contains a piece of the same color.
+     *
+     * @param r target row
+     * @param c target column
+     * @param piece the moving piece
+     * @return {@code true} if same color; {@code false} otherwise
+     */
     private boolean isSameColor(int r, int c, String piece) {
         String target = squares[r][c].getPieceKey();
         if (target == null) return false;
         return (piece.startsWith("WHITE") && target.startsWith("WHITE")) ||
-                (piece.startsWith("BLACK") && target.startsWith("BLACK"));
+               (piece.startsWith("BLACK") && target.startsWith("BLACK"));
     }
 
-    // Helper: remove all highlights
+    /** Removes all move highlights from the board. */
     private void clearHighlights() {
         for (SquarePanel[] rowArr : squares)
             for (SquarePanel sq : rowArr)
                 sq.setHighlighted(false);
     }
 
-
-
-    // KYLE: Reset board for "New Game"
-    // KYLE: Reset the full board properly
+    /**
+     * Resets the board to its initial state, clearing all pieces,
+     * move history, and highlights.
+     */
     public void resetBoard() {
-        // Clear every square before re-populating
-        for (SquarePanel[] row : squares) {
+        for (SquarePanel[] row : squares)
             for (SquarePanel s : row) {
-                s.clearPiece();        // remove any piece icon
-                s.setHighlighted(false); // remove yellow border if selected
+                s.clearPiece();
+                s.setHighlighted(false);
             }
-        }
 
-        // Re-add pieces in starting positions
         initializePieces();
-
         whiteTurn = true;
         if (parentGUI != null)
             parentGUI.updateStatus("White's Turn");
-        // --- added for GameHistoryPanel ---
         if (historyPanel != null)
             historyPanel.reset();
 
-
-        // Force a redraw to clear ghost icons
         revalidate();
         repaint();
         if (parentGUI != null) parentGUI.resetTimers();
-
     }
-	
-	// --- SAVE GAME ---
-	public void saveGame() {
-		JFileChooser fileChooser = new JFileChooser();
-		int option = fileChooser.showSaveDialog(this);
-		if (option != JFileChooser.APPROVE_OPTION) return;
 
-		File file = fileChooser.getSelectedFile();
+    /**
+     * Saves the current game state (board, turn, and move history) to a file.
+     * Displays a file chooser for user input.
+     */
+    public void saveGame() {
+        JFileChooser fileChooser = new JFileChooser();
+        int option = fileChooser.showSaveDialog(this);
+        if (option != JFileChooser.APPROVE_OPTION) return;
 
-		try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(file))) {
-			GameState state = new GameState();
+        File file = fileChooser.getSelectedFile();
 
-			// Save board state
-			for (int row = 0; row < BOARD_SIZE; row++) {
-				for (int col = 0; col < BOARD_SIZE; col++) {
-					state.board[row][col] = squares[row][col].getPieceKey();
-				}
-			}
+        try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(file))) {
+            GameState state = new GameState();
 
-			// Save turn info
-			state.whiteTurn = this.whiteTurn;
+            for (int row = 0; row < BOARD_SIZE; row++) {
+                for (int col = 0; col < BOARD_SIZE; col++) {
+                    state.board[row][col] = squares[row][col].getPieceKey();
+                }
+            }
 
-			// Save move history (just store "from" and "to" coordinates)
-			for (MoveRecord m : moveHistory) {
-				state.moveHistory.add(new GameState.MoveData(m.fromRow, m.fromCol, m.toRow, m.toCol, m.capturedPiece));
-			}
+            state.whiteTurn = this.whiteTurn;
 
-			out.writeObject(state);
-			JOptionPane.showMessageDialog(this, "Game saved successfully!", "Save", JOptionPane.INFORMATION_MESSAGE);
-		} catch (IOException e) {
-			JOptionPane.showMessageDialog(this, "Error saving game: "+e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-		}
-	}
+            for (MoveRecord m : moveHistory) {
+                state.moveHistory.add(new GameState.MoveData(
+                        m.fromRow, m.fromCol, m.toRow, m.toCol, m.capturedPiece));
+            }
 
-	// --- LOAD GAME ---
-	public void loadGame() {
-		JFileChooser fileChooser = new JFileChooser();
-		int option = fileChooser.showOpenDialog(this);
-		if (option != JFileChooser.APPROVE_OPTION) return;
+            out.writeObject(state);
+            JOptionPane.showMessageDialog(this, "Game saved successfully!", "Save", JOptionPane.INFORMATION_MESSAGE);
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(this, "Error saving game: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
 
-		File file = fileChooser.getSelectedFile();
+    /**
+     * Loads a previously saved game from file and restores the board, moves,
+     * and turn state.
+     */
+    public void loadGame() {
+        JFileChooser fileChooser = new JFileChooser();
+        int option = fileChooser.showOpenDialog(this);
+        if (option != JFileChooser.APPROVE_OPTION) return;
 
-		try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(file))) {
-			GameState state = (GameState) in.readObject();
+        File file = fileChooser.getSelectedFile();
 
-			// Restore board
-			for (int row = 0; row < BOARD_SIZE; row++) {
-				for (int col = 0; col < BOARD_SIZE; col++) {
-					String piece = state.board[row][col];
-					squares[row][col].setPiece(piece);
-				}
-			}
+        try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(file))) {
+            GameState state = (GameState) in.readObject();
 
-			// Restore turn
-			this.whiteTurn = state.whiteTurn;
-			if (parentGUI != null)
-				parentGUI.updateStatus(whiteTurn ? "White's Turn" : "Black's Turn");
+            for (int row = 0; row < BOARD_SIZE; row++) {
+                for (int col = 0; col < BOARD_SIZE; col++) {
+                    squares[row][col].setPiece(state.board[row][col]);
+                }
+            }
 
-			// Restore move history
-			moveHistory.clear();
-			for (GameState.MoveData md : state.moveHistory) {
-				SquarePanel from = squares[md.fromRow][md.fromCol];
-				SquarePanel to = squares[md.toRow][md.toCol];
-				moveHistory.add(new MoveRecord(from, to, md.capturedPiece));
-			}
+            this.whiteTurn = state.whiteTurn;
+            if (parentGUI != null)
+                parentGUI.updateStatus(whiteTurn ? "White's Turn" : "Black's Turn");
 
-			revalidate();
-			repaint();
+            moveHistory.clear();
+            for (GameState.MoveData md : state.moveHistory) {
+                moveHistory.add(new MoveRecord(
+                        squares[md.fromRow][md.fromCol],
+                        squares[md.toRow][md.toCol],
+                        md.capturedPiece));
+            }
 
-			JOptionPane.showMessageDialog(this, "Game loaded successfully!", "Load", JOptionPane.INFORMATION_MESSAGE);
+            revalidate();
+            repaint();
 
-		} catch (IOException | ClassNotFoundException e) {
-			JOptionPane.showMessageDialog(this, "Error loading game: "+e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-		}
-	}
+            JOptionPane.showMessageDialog(this, "Game loaded successfully!", "Load", JOptionPane.INFORMATION_MESSAGE);
+        } catch (IOException | ClassNotFoundException e) {
+            JOptionPane.showMessageDialog(this, "Error loading game: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
 
-    // KYLE: Undo last move
+    /**
+     * Undoes the most recent move, restoring the previous board state.
+     */
     public void undoLastMove() {
         if (!moveHistory.isEmpty()) {
             MoveRecord last = moveHistory.pop();
@@ -363,32 +376,29 @@ public class BoardPanel extends JPanel {
             whiteTurn = !whiteTurn;
             if (parentGUI != null)
                 parentGUI.updateStatus(whiteTurn ? "White's Turn" : "Black's Turn");
-            // --- added for GameHistoryPanel ---
             if (historyPanel != null)
                 historyPanel.removeLastMove();
-
         }
     }
 
-    // KYLE: track each move for Undo
+    /** Represents a record of a single chess move, used for undo and save/load. */
     private static class MoveRecord {
         private final SquarePanel from, to;
         private final String capturedPiece;
-		private final int fromRow, fromCol, toRow, toCol;
+        private final int fromRow, fromCol, toRow, toCol;
 
         MoveRecord(SquarePanel from, SquarePanel to) {
             this(from, to, to.getPieceKey());
         }
-		
-		//Overloaded method
-		MoveRecord(SquarePanel from, SquarePanel to, String capturedPiece) {
+
+        MoveRecord(SquarePanel from, SquarePanel to, String capturedPiece) {
             this.from = from;
             this.to = to;
             this.capturedPiece = capturedPiece;
-			this.fromRow = from.getRow();
-			this.fromCol = from.getCol();
-			this.toRow = to.getRow();
-			this.toCol = to.getCol();
+            this.fromRow = from.getRow();
+            this.fromCol = from.getCol();
+            this.toRow = to.getRow();
+            this.toCol = to.getCol();
         }
 
         void undo() {
@@ -399,27 +409,24 @@ public class BoardPanel extends JPanel {
                 to.clearPiece();
         }
     }
-	
-	//Save file class
-	private static class GameState implements Serializable {
-		String[][] board = new String[BOARD_SIZE][BOARD_SIZE];
-		boolean whiteTurn;
-		List<MoveData> moveHistory = new ArrayList<>();
 
-		static class MoveData implements Serializable {
-			int fromRow, fromCol, toRow, toCol;
-			String capturedPiece;
-			MoveData(int fromRow, int fromCol, int toRow, int toCol, String capturedPiece) {
-				this.fromRow = fromRow;
-				this.fromCol = fromCol;
-				this.toRow = toRow;
-				this.toCol = toCol;
-				this.capturedPiece = capturedPiece;
-			}
-		}
-	}
+    /** Serializable container for game save data (board, turn, and move history). */
+    private static class GameState implements Serializable {
+        String[][] board = new String[BOARD_SIZE][BOARD_SIZE];
+        boolean whiteTurn;
+        List<MoveData> moveHistory = new ArrayList<>();
 
+        static class MoveData implements Serializable {
+            int fromRow, fromCol, toRow, toCol;
+            String capturedPiece;
 
-
-
+            MoveData(int fromRow, int fromCol, int toRow, int toCol, String capturedPiece) {
+                this.fromRow = fromRow;
+                this.fromCol = fromCol;
+                this.toRow = toRow;
+                this.toCol = toCol;
+                this.capturedPiece = capturedPiece;
+            }
+        }
+    }
 }
