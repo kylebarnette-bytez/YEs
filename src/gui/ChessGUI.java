@@ -51,21 +51,6 @@ public class ChessGUI extends JFrame{
         add(sidePanel, BorderLayout.EAST);
 
 
-////        //New Game button implemented in menu bar
-////        //JButton newGameBtn = new JButton("New Game");
-////        JButton undoBtn = new JButton("Undo Move");
-////        JButton exitBtn = new JButton("Exit");
-//
-//        //newGameBtn.addActionListener(e -> boardPanel.resetBoard());
-//        undoBtn.addActionListener(e -> boardPanel.undoLastMove());
-//        exitBtn.addActionListener(e -> System.exit(0));
-//
-//        //controlPanel.add(newGameBtn);
-//        controlPanel.add(undoBtn);
-//        controlPanel.add(exitBtn);
-//
-//        add(controlPanel, BorderLayout.EAST);
-
         // --- South: Status bar ---
         statusLabel = new JLabel("White's Turn", SwingConstants.CENTER);
         statusLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
@@ -106,6 +91,28 @@ public class ChessGUI extends JFrame{
     public void updateStatus(String text) {
         statusLabel.setText(text);
     }
+
+    /**
+     * Temporarily show a short message in the status bar.
+     * Automatically restores the normal turn message after a moment.
+     */
+    public void flashMessage(String text) {
+        statusLabel.setText(text);
+
+        // Restore the normal status after 2 seconds
+        new javax.swing.Timer(2000, e -> {
+            statusLabel.setText(whiteTurnText());
+        }) {{
+            setRepeats(false);
+            start();
+        }};
+    }
+
+    /** Returns the standard turn text. */
+    private String whiteTurnText() {
+        return boardPanel.isWhiteTurn() ? "White's Turn" : "Black's Turn";
+    }
+
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(ChessGUI::new);

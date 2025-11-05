@@ -69,10 +69,11 @@ public class SquarePanel extends JPanel {
     public void setHighlighted(boolean highlighted) {
         this.highlighted = highlighted;
         if (highlighted) {
-            setBorder(BorderFactory.createLineBorder(Color.YELLOW, 3));
+            setBorder(BorderFactory.createLineBorder(Color.GREEN, 3)); // green for moves
         } else {
             setBorder(null);
         }
         repaint();
     }
+
 }

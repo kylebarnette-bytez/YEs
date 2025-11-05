@@ -23,6 +23,10 @@ public class BoardPanel extends JPanel {
     public void setHistoryPanel(GameHistoryPanel panel) {
         this.historyPanel = panel;
     }
+    public boolean isWhiteTurn() {
+        return whiteTurn;
+    }
+
 
 
 
@@ -72,27 +76,39 @@ public class BoardPanel extends JPanel {
     }
 
     public void handleSquareClick(SquarePanel clicked) {
+
+        // 1️⃣ — Selecting a piece
         if (selectedSquare == null) {
             if (clicked.hasPiece() && isCorrectTurn(clicked.getPieceKey())) {
+                clearHighlights(); // remove any old highlights first
                 selectedSquare = clicked;
-                clicked.setHighlighted(true);
+                if (parentGUI != null) {
+                    parentGUI.flashMessage("Showing possible moves for " + clicked.getPieceKey().replace("_", " "));
+                }
+
+                showPossibleMoves(clicked); // 🔥 highlight all possible moves
+                clicked.setHighlighted(true); // highlight selected piece
             }
             return;
         }
 
+        // 2️⃣ — Clicking the same square again cancels selection
         if (clicked == selectedSquare) {
+            clearHighlights(); // 🧹 remove move highlights
             selectedSquare.setHighlighted(false);
             selectedSquare = null;
             return;
         }
 
-        // KYLE: track move history for Undo
+        // 3️⃣ — Otherwise, it’s a move attempt
         moveHistory.push(new MoveRecord(selectedSquare, clicked));
+
         // --- added for GameHistoryPanel ---
         String movingPiece = selectedSquare.getPieceKey();
         String capturedPiece = clicked.getPieceKey();
         String from = "(" + selectedSquare.getRow() + "," + selectedSquare.getCol() + ")";
         String to = "(" + clicked.getRow() + "," + clicked.getCol() + ")";
+
         if (historyPanel != null) {
             historyPanel.addMove(movingPiece + ": " + from + " → " + to);
             if (capturedPiece != null && !capturedPiece.isEmpty()) {
@@ -101,8 +117,7 @@ public class BoardPanel extends JPanel {
             }
         }
 
-
-        // KYLE: check if King captured
+        // 4️⃣ — Check for King capture (endgame)
         if (clicked.hasPiece() && clicked.getPieceKey().contains("KING")) {
             String winner = whiteTurn ? "White" : "Black";
             clicked.setPiece(selectedSquare.getPieceKey());
@@ -111,23 +126,126 @@ public class BoardPanel extends JPanel {
             return;
         }
 
-//        String movingPiece = selectedSquare.getPieceKey();
+        // 5️⃣ — Perform the actual move
         clicked.setPiece(movingPiece);
-
         selectedSquare.clearPiece();
+
+        // 6️⃣ — Clean up highlights and selection
+        clearHighlights(); // remove possible-move highlights
         selectedSquare.setHighlighted(false);
         selectedSquare = null;
-        // KYLE: switch turns and update label
+
+        // 7️⃣ — Switch turn and update status label
         whiteTurn = !whiteTurn;
         if (parentGUI != null)
             parentGUI.updateStatus(whiteTurn ? "White's Turn" : "Black's Turn");
-
     }
+
     // KYLE: ensures correct player moves
     private boolean isCorrectTurn(String pieceKey) {
         return (whiteTurn && pieceKey.startsWith("WHITE")) ||
                 (!whiteTurn && pieceKey.startsWith("BLACK"));
     }
+
+    // --- Highlight Feature: Show possible moves for a selected piece ---
+    public void showPossibleMoves(SquarePanel fromSquare) {
+        clearHighlights(); // Remove any old highlights first
+
+        String piece = fromSquare.getPieceKey();
+        if (piece == null || piece.isEmpty()) return;
+
+        int row = fromSquare.getRow();
+        int col = fromSquare.getCol();
+
+        if (piece.equals("WHITE_PAWN")) {
+            if (row > 0 && !squares[row - 1][col].hasPiece()) {
+                squares[row - 1][col].setHighlighted(true); // move forward
+            }
+            // capture diagonally
+            if (row > 0 && col > 0 && squares[row - 1][col - 1].hasPiece() &&
+                    squares[row - 1][col - 1].getPieceKey().startsWith("BLACK"))
+                squares[row - 1][col - 1].setHighlighted(true);
+            if (row > 0 && col < 7 && squares[row - 1][col + 1].hasPiece() &&
+                    squares[row - 1][col + 1].getPieceKey().startsWith("BLACK"))
+                squares[row - 1][col + 1].setHighlighted(true);
+        }
+
+        else if (piece.equals("BLACK_PAWN")) {
+            if (row < 7 && !squares[row + 1][col].hasPiece()) {
+                squares[row + 1][col].setHighlighted(true);
+            }
+            // capture diagonally
+            if (row < 7 && col > 0 && squares[row + 1][col - 1].hasPiece() &&
+                    squares[row + 1][col - 1].getPieceKey().startsWith("WHITE"))
+                squares[row + 1][col - 1].setHighlighted(true);
+            if (row < 7 && col < 7 && squares[row + 1][col + 1].hasPiece() &&
+                    squares[row + 1][col + 1].getPieceKey().startsWith("WHITE"))
+                squares[row + 1][col + 1].setHighlighted(true);
+        }
+
+        else if (piece.endsWith("KNIGHT")) {
+            int[][] moves = {{2,1},{1,2},{-1,2},{-2,1},{-2,-1},{-1,-2},{1,-2},{2,-1}};
+            for (int[] m : moves) {
+                int r = row + m[0], c = col + m[1];
+                if (r >= 0 && r < 8 && c >= 0 && c < 8 && !isSameColor(r, c, piece))
+                    squares[r][c].setHighlighted(true);
+            }
+        }
+
+        else if (piece.endsWith("BISHOP") || piece.endsWith("QUEEN")) {
+            int[][] dirs = {{1,1},{1,-1},{-1,1},{-1,-1}};
+            slideMoves(row, col, dirs, piece);
+        }
+
+        else if (piece.endsWith("ROOK") || piece.endsWith("QUEEN")) {
+            int[][] dirs = {{1,0},{-1,0},{0,1},{0,-1}};
+            slideMoves(row, col, dirs, piece);
+        }
+
+        else if (piece.endsWith("KING")) {
+            for (int dr = -1; dr <= 1; dr++) {
+                for (int dc = -1; dc <= 1; dc++) {
+                    if (dr == 0 && dc == 0) continue;
+                    int r = row + dr, c = col + dc;
+                    if (r >= 0 && r < 8 && c >= 0 && c < 8 && !isSameColor(r, c, piece))
+                        squares[r][c].setHighlighted(true);
+                }
+            }
+        }
+    }
+
+    // Helper: Slide in given directions until blocked
+    private void slideMoves(int row, int col, int[][] dirs, String piece) {
+        for (int[] dir : dirs) {
+            int r = row + dir[0], c = col + dir[1];
+            while (r >= 0 && r < 8 && c >= 0 && c < 8) {
+                if (squares[r][c].hasPiece()) {
+                    if (!isSameColor(r, c, piece))
+                        squares[r][c].setHighlighted(true);
+                    break; // stop at first piece
+                }
+                squares[r][c].setHighlighted(true);
+                r += dir[0];
+                c += dir[1];
+            }
+        }
+    }
+
+    // Helper: check if target square has same color piece
+    private boolean isSameColor(int r, int c, String piece) {
+        String target = squares[r][c].getPieceKey();
+        if (target == null) return false;
+        return (piece.startsWith("WHITE") && target.startsWith("WHITE")) ||
+                (piece.startsWith("BLACK") && target.startsWith("BLACK"));
+    }
+
+    // Helper: remove all highlights
+    private void clearHighlights() {
+        for (SquarePanel[] rowArr : squares)
+            for (SquarePanel sq : rowArr)
+                sq.setHighlighted(false);
+    }
+
 
 
     // KYLE: Reset board for "New Game"
@@ -295,5 +413,8 @@ public class BoardPanel extends JPanel {
 			}
 		}
 	}
+
+
+
 
 }
