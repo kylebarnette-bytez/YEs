@@ -12,6 +12,9 @@ import gui.*;
 
 public class ChessGUI extends JFrame{
     private final BoardPanel boardPanel;
+    // --- added for GameHistoryPanel ---
+    private final GameHistoryPanel historyPanel;
+
     private final JLabel statusLabel;
 
     public ChessGUI() {
@@ -24,25 +27,44 @@ public class ChessGUI extends JFrame{
         boardPanel = new BoardPanel(this);
         add(boardPanel, BorderLayout.CENTER);
 
-        // --- East: Control buttons ---
-        JPanel controlPanel = new JPanel();
-        controlPanel.setLayout(new GridLayout(5, 1, 10, 10));
-        controlPanel.setBorder(BorderFactory.createEmptyBorder(20, 10, 20, 10));
+        // --- East: Combined side panel (controls + move history) ---
+        JPanel sidePanel = new JPanel(new BorderLayout());
+        sidePanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-		//New Game button implemented in menu bar
-        //JButton newGameBtn = new JButton("New Game"); 
+        JPanel controlPanel = new JPanel(new GridLayout(5, 1, 10, 10));
+        controlPanel.setMaximumSize(new Dimension(200, 120));
         JButton undoBtn = new JButton("Undo Move");
         JButton exitBtn = new JButton("Exit");
 
-        //newGameBtn.addActionListener(e -> boardPanel.resetBoard());
         undoBtn.addActionListener(e -> boardPanel.undoLastMove());
         exitBtn.addActionListener(e -> System.exit(0));
 
-        //controlPanel.add(newGameBtn);
         controlPanel.add(undoBtn);
         controlPanel.add(exitBtn);
 
-        add(controlPanel, BorderLayout.EAST);
+// --- added for GameHistoryPanel ---
+        historyPanel = new GameHistoryPanel();
+        boardPanel.setHistoryPanel(historyPanel); // link BoardPanel → HistoryPanel
+
+        sidePanel.add(controlPanel, BorderLayout.NORTH);
+        sidePanel.add(historyPanel, BorderLayout.CENTER);
+        add(sidePanel, BorderLayout.EAST);
+
+
+////        //New Game button implemented in menu bar
+////        //JButton newGameBtn = new JButton("New Game");
+////        JButton undoBtn = new JButton("Undo Move");
+////        JButton exitBtn = new JButton("Exit");
+//
+//        //newGameBtn.addActionListener(e -> boardPanel.resetBoard());
+//        undoBtn.addActionListener(e -> boardPanel.undoLastMove());
+//        exitBtn.addActionListener(e -> System.exit(0));
+//
+//        //controlPanel.add(newGameBtn);
+//        controlPanel.add(undoBtn);
+//        controlPanel.add(exitBtn);
+//
+//        add(controlPanel, BorderLayout.EAST);
 
         // --- South: Status bar ---
         statusLabel = new JLabel("White's Turn", SwingConstants.CENTER);

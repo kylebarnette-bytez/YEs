@@ -18,6 +18,12 @@ public class BoardPanel extends JPanel {
     private boolean whiteTurn = true;
     private final Stack<MoveRecord> moveHistory = new Stack<>();
     private ChessGUI parentGUI; // reference to parent for popup + status updates
+    // --- added for GameHistoryPanel ---
+    private GameHistoryPanel historyPanel;
+    public void setHistoryPanel(GameHistoryPanel panel) {
+        this.historyPanel = panel;
+    }
+
 
 
     public BoardPanel(ChessGUI parent) { // KYLE: added parent for GUI communication
@@ -82,8 +88,21 @@ public class BoardPanel extends JPanel {
 
         // KYLE: track move history for Undo
         moveHistory.push(new MoveRecord(selectedSquare, clicked));
+        // --- added for GameHistoryPanel ---
+        String movingPiece = selectedSquare.getPieceKey();
+        String capturedPiece = clicked.getPieceKey();
+        String from = "(" + selectedSquare.getRow() + "," + selectedSquare.getCol() + ")";
+        String to = "(" + clicked.getRow() + "," + clicked.getCol() + ")";
+        if (historyPanel != null) {
+            historyPanel.addMove(movingPiece + ": " + from + " → " + to);
+            if (capturedPiece != null && !capturedPiece.isEmpty()) {
+                String currentPlayer = whiteTurn ? "White" : "Black";
+                historyPanel.addCapturedPiece(currentPlayer, capturedPiece);
+            }
+        }
 
-		// KYLE: check if King captured
+
+        // KYLE: check if King captured
         if (clicked.hasPiece() && clicked.getPieceKey().contains("KING")) {
             String winner = whiteTurn ? "White" : "Black";
             clicked.setPiece(selectedSquare.getPieceKey());
@@ -92,7 +111,7 @@ public class BoardPanel extends JPanel {
             return;
         }
 
-        String movingPiece = selectedSquare.getPieceKey();
+//        String movingPiece = selectedSquare.getPieceKey();
         clicked.setPiece(movingPiece);
 
         selectedSquare.clearPiece();
@@ -128,6 +147,10 @@ public class BoardPanel extends JPanel {
         whiteTurn = true;
         if (parentGUI != null)
             parentGUI.updateStatus("White's Turn");
+        // --- added for GameHistoryPanel ---
+        if (historyPanel != null)
+            historyPanel.reset();
+
 
         // Force a redraw to clear ghost icons
         revalidate();
@@ -217,6 +240,10 @@ public class BoardPanel extends JPanel {
             whiteTurn = !whiteTurn;
             if (parentGUI != null)
                 parentGUI.updateStatus(whiteTurn ? "White's Turn" : "Black's Turn");
+            // --- added for GameHistoryPanel ---
+            if (historyPanel != null)
+                historyPanel.removeLastMove();
+
         }
     }
 
