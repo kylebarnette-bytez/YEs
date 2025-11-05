@@ -77,7 +77,7 @@ public class BoardPanel extends JPanel {
 
     public void handleSquareClick(SquarePanel clicked) {
 
-        // 1️⃣ — Selecting a piece
+        //  Selecting a piece
         if (selectedSquare == null) {
             if (clicked.hasPiece() && isCorrectTurn(clicked.getPieceKey())) {
                 clearHighlights(); // remove any old highlights first
@@ -137,8 +137,11 @@ public class BoardPanel extends JPanel {
 
         // 7️⃣ — Switch turn and update status label
         whiteTurn = !whiteTurn;
-        if (parentGUI != null)
+        if (parentGUI != null) {
             parentGUI.updateStatus(whiteTurn ? "White's Turn" : "Black's Turn");
+            parentGUI.switchTurnTimer(whiteTurn); // 👈 new method call
+        }
+
     }
 
     // KYLE: ensures correct player moves
@@ -273,6 +276,8 @@ public class BoardPanel extends JPanel {
         // Force a redraw to clear ghost icons
         revalidate();
         repaint();
+        if (parentGUI != null) parentGUI.resetTimers();
+
     }
 	
 	// --- SAVE GAME ---
