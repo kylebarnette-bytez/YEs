@@ -1,0 +1,1 @@
+typeSearchIndex = [{"l":"All Classes and Interfaces","u":"allclasses-index.html"},{"p":"gui","l":"BoardPanel"},{"p":"gui","l":"ChessGUI"},{"p":"gui","l":"GameHistoryPanel"},{"p":"gui","l":"GuiMain"},{"p":"gui","l":"PieceIcons"},{"p":"gui","l":"SquarePanel"}];updateSearchResults();
