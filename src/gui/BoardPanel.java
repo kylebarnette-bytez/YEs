@@ -7,12 +7,21 @@ import java.io.*;
 import javax.swing.*;
 import java.awt.*;
 
+// Backend Imports
+import board.Board;
+import position.Position;
+import pieces.Piece;
+// note: DON'T import utils.Color; we'll use utils.Color fully qualified
+
 /**
  * Represents the main chessboard panel responsible for rendering the 8×8 grid,
  * handling user interactions, piece movement, and communication with the GUI
  * and game history components.
  */
 public class BoardPanel extends JPanel {
+
+    private Board backendBoard;       // ← REAL chess engine board
+    private boolean gameOver = false; // ← stop clicks after checkmate
 
     private static final int BOARD_SIZE = 8;
     private final SquarePanel[][] squares = new SquarePanel[BOARD_SIZE][BOARD_SIZE];
@@ -48,10 +57,13 @@ public class BoardPanel extends JPanel {
      */
     public BoardPanel(ChessGUI parent) {
         this.parentGUI = parent;
+        this.backendBoard = new Board(); // uses backend initializeBoard()
+
         setLayout(new GridLayout(BOARD_SIZE, BOARD_SIZE));
         initializeBoard();
-        initializePieces();
+        syncBoardFromBackend(); // ← NEW: fill squares from backend instead of initializePieces()
     }
+
 
     /** Initializes all 64 squares of the chessboard grid. */
     private void initializeBoard() {
@@ -98,20 +110,40 @@ public class BoardPanel extends JPanel {
      * @param clicked the square that was clicked
      */
     public void handleSquareClick(SquarePanel clicked) {
+
+        if (gameOver) return;
+
+        int row = clicked.getRow();
+        int col = clicked.getCol();
+        Position clickedPos = new Position(row, col);
+        Piece clickedPiece = backendBoard.getPiece(clickedPos);
+
+        // 1) First click: select a piece
         if (selectedSquare == null) {
-            if (clicked.hasPiece() && isCorrectTurn(clicked.getPieceKey())) {
-                clearHighlights();
-                selectedSquare = clicked;
+            if (clickedPiece == null) return;
+
+            // must select current player's color
+            if ((clickedPiece.getColor() == utils.Color.WHITE) != whiteTurn) {
                 if (parentGUI != null) {
-                    parentGUI.flashMessage("Showing possible moves for " +
-                            clicked.getPieceKey().replace("_", " "));
+                    parentGUI.flashMessage("It's " + (whiteTurn ? "White" : "Black") + "'s turn.");
                 }
-                showPossibleMoves(clicked);
-                clicked.setHighlighted(true);
+                return;
             }
+
+            clearHighlights();
+            selectedSquare = clicked;
+
+            if (parentGUI != null) {
+                parentGUI.flashMessage("Showing possible moves for " +
+                        pieceToKey(clickedPiece).replace("_", " "));
+            }
+
+            showPossibleMoves(clicked);
+            clicked.setHighlighted(true);
             return;
         }
 
+        // 2) Clicking the same square again → deselect
         if (clicked == selectedSquare) {
             clearHighlights();
             selectedSquare.setHighlighted(false);
@@ -119,41 +151,89 @@ public class BoardPanel extends JPanel {
             return;
         }
 
-        moveHistory.push(new MoveRecord(selectedSquare, clicked));
+        // 3) Second click → attempt move
+        Position from = new Position(selectedSquare.getRow(), selectedSquare.getCol());
+        Position to   = clickedPos;
 
-        String movingPiece = selectedSquare.getPieceKey();
-        String capturedPiece = clicked.getPieceKey();
-        String from = "(" + selectedSquare.getRow() + "," + selectedSquare.getCol() + ")";
-        String to = "(" + clicked.getRow() + "," + clicked.getCol() + ")";
+        Piece moving = backendBoard.getPiece(from);
+        Piece destBefore = backendBoard.getPiece(to); // for capture history
 
-        if (historyPanel != null) {
-            historyPanel.addMove(movingPiece + ": " + from + " → " + to);
-            if (capturedPiece != null && !capturedPiece.isEmpty()) {
-                String currentPlayer = whiteTurn ? "White" : "Black";
-                historyPanel.addCapturedPiece(currentPlayer, capturedPiece);
-            }
-        }
-
-        if (clicked.hasPiece() && clicked.getPieceKey().contains("KING")) {
-            String winner = whiteTurn ? "White" : "Black";
-            clicked.setPiece(selectedSquare.getPieceKey());
-            selectedSquare.clearPiece();
-            if (parentGUI != null) parentGUI.showEndgameMessage(winner);
+        if (moving == null) {
+            clearHighlights();
+            selectedSquare.setHighlighted(false);
+            selectedSquare = null;
             return;
         }
 
-        clicked.setPiece(movingPiece);
-        selectedSquare.clearPiece();
+        // Validate with backend rules
+        boolean valid = backendBoard.validateMove(from, to);
+        if (valid && backendBoard.movePutsPlayerInCheck(from, to, moving.getColor())) {
+            valid = false;
+        }
+
+        if (!valid) {
+            if (parentGUI != null) parentGUI.flashMessage("Invalid move");
+            clearHighlights();
+            selectedSquare.setHighlighted(false);
+            selectedSquare = null;
+            return;
+        }
+
+        // Optional: still record GUI move for undo/save (GUI-level)
+        moveHistory.push(new MoveRecord(selectedSquare, clicked));
+
+        // Perform move in backend
+        try {
+            backendBoard.movePiece(from, to); // may throw if something is wrong
+        } catch (IllegalArgumentException ex) {
+            if (parentGUI != null) parentGUI.flashMessage("Invalid move: " + ex.getMessage());
+            clearHighlights();
+            selectedSquare.setHighlighted(false);
+            selectedSquare = null;
+            return;
+        }
+
+        // Sync GUI with backend board state
+        syncBoardFromBackend();
+
+        // Update history panel
+        if (historyPanel != null) {
+            String movingKey = pieceToKey(moving);
+            String fromStr = "(" + from.getRow() + "," + from.getCol() + ")";
+            String toStr   = "(" + to.getRow() + "," + to.getCol() + ")";
+            historyPanel.addMove(movingKey + ": " + fromStr + " → " + toStr);
+            if (destBefore != null) {
+                String currentPlayer = whiteTurn ? "White" : "Black";
+                historyPanel.addCapturedPiece(currentPlayer, pieceToKey(destBefore));
+            }
+        }
+
         clearHighlights();
         selectedSquare.setHighlighted(false);
         selectedSquare = null;
 
+        // 4) Check / Checkmate detection on opponent
+        utils.Color opponentColor = whiteTurn ? utils.Color.BLACK : utils.Color.WHITE;
+
+        if (backendBoard.isCheck(opponentColor)) {
+            if (parentGUI != null) parentGUI.updateStatus("Check!");
+
+            if (backendBoard.isCheckmate(opponentColor)) {
+                gameOver = true;
+                String winner = whiteTurn ? "White" : "Black";
+                if (parentGUI != null) parentGUI.showEndgameMessage(winner);
+                return;
+            }
+        }
+
+        // 5) Switch turn + timers
         whiteTurn = !whiteTurn;
         if (parentGUI != null) {
             parentGUI.updateStatus(whiteTurn ? "White's Turn" : "Black's Turn");
             parentGUI.switchTurnTimer(whiteTurn);
         }
     }
+
 
     /**
      * Determines whether the clicked piece belongs to the player whose turn it is.
@@ -173,54 +253,27 @@ public class BoardPanel extends JPanel {
      */
     public void showPossibleMoves(SquarePanel fromSquare) {
         clearHighlights();
-        String piece = fromSquare.getPieceKey();
-        if (piece == null || piece.isEmpty()) return;
 
-        int row = fromSquare.getRow();
-        int col = fromSquare.getCol();
+        Position from = new Position(fromSquare.getRow(), fromSquare.getCol());
+        Piece piece = backendBoard.getPiece(from);
+        if (piece == null) return;
 
-        if (piece.equals("WHITE_PAWN")) {
-            if (row > 0 && !squares[row - 1][col].hasPiece())
-                squares[row - 1][col].setHighlighted(true);
-            if (row > 0 && col > 0 && squares[row - 1][col - 1].hasPiece() &&
-                squares[row - 1][col - 1].getPieceKey().startsWith("BLACK"))
-                squares[row - 1][col - 1].setHighlighted(true);
-            if (row > 0 && col < 7 && squares[row - 1][col + 1].hasPiece() &&
-                squares[row - 1][col + 1].getPieceKey().startsWith("BLACK"))
-                squares[row - 1][col + 1].setHighlighted(true);
-        } else if (piece.equals("BLACK_PAWN")) {
-            if (row < 7 && !squares[row + 1][col].hasPiece())
-                squares[row + 1][col].setHighlighted(true);
-            if (row < 7 && col > 0 && squares[row + 1][col - 1].hasPiece() &&
-                squares[row + 1][col - 1].getPieceKey().startsWith("WHITE"))
-                squares[row + 1][col - 1].setHighlighted(true);
-            if (row < 7 && col < 7 && squares[row + 1][col + 1].hasPiece() &&
-                squares[row + 1][col + 1].getPieceKey().startsWith("WHITE"))
-                squares[row + 1][col + 1].setHighlighted(true);
-        } else if (piece.endsWith("KNIGHT")) {
-            int[][] moves = {{2,1},{1,2},{-1,2},{-2,1},{-2,-1},{-1,-2},{1,-2},{2,-1}};
-            for (int[] m : moves) {
-                int r = row + m[0], c = col + m[1];
-                if (r >= 0 && r < 8 && c >= 0 && c < 8 && !isSameColor(r, c, piece))
-                    squares[r][c].setHighlighted(true);
-            }
-        } else if (piece.endsWith("BISHOP") || piece.endsWith("QUEEN")) {
-            int[][] dirs = {{1,1},{1,-1},{-1,1},{-1,-1}};
-            slideMoves(row, col, dirs, piece);
-        } else if (piece.endsWith("ROOK") || piece.endsWith("QUEEN")) {
-            int[][] dirs = {{1,0},{-1,0},{0,1},{0,-1}};
-            slideMoves(row, col, dirs, piece);
-        } else if (piece.endsWith("KING")) {
-            for (int dr = -1; dr <= 1; dr++) {
-                for (int dc = -1; dc <= 1; dc++) {
-                    if (dr == 0 && dc == 0) continue;
-                    int r = row + dr, c = col + dc;
-                    if (r >= 0 && r < 8 && c >= 0 && c < 8 && !isSameColor(r, c, piece))
-                        squares[r][c].setHighlighted(true);
-                }
+        java.util.List<Position> rawMoves = piece.possibleMoves(backendBoard);
+        java.util.List<Position> legalMoves = new ArrayList<>();
+
+        // Filter out moves that would leave this player in check
+        utils.Color color = piece.getColor();
+        for (Position to : rawMoves) {
+            if (!backendBoard.movePutsPlayerInCheck(from, to, color)) {
+                legalMoves.add(to);
             }
         }
+
+        for (Position to : legalMoves) {
+            squares[to.getRow()][to.getCol()].setHighlighted(true);
+        }
     }
+
 
     /**
      * Generates possible slide-type moves (used by rooks, bishops, and queens).
@@ -273,22 +326,22 @@ public class BoardPanel extends JPanel {
      * move history, and highlights.
      */
     public void resetBoard() {
-        for (SquarePanel[] row : squares)
-            for (SquarePanel s : row) {
-                s.clearPiece();
-                s.setHighlighted(false);
-            }
-
-        initializePieces();
+        backendBoard = new Board();   // reset backend model
+        gameOver = false;
         whiteTurn = true;
-        if (parentGUI != null)
-            parentGUI.updateStatus("White's Turn");
-        if (historyPanel != null)
-            historyPanel.reset();
+        selectedSquare = null;
+        moveHistory.clear();
+        clearHighlights();
 
-        revalidate();
-        repaint();
-        if (parentGUI != null) parentGUI.resetTimers();
+        syncBoardFromBackend();       // redraw GUI from backend
+
+        if (parentGUI != null) {
+            parentGUI.updateStatus("White's Turn");
+            parentGUI.resetTimers();
+        }
+        if (historyPanel != null) {
+            historyPanel.reset();
+        }
     }
 
     /**
@@ -429,4 +482,31 @@ public class BoardPanel extends JPanel {
             }
         }
     }
+    /** Converts a backend Piece into a GUI pieceKey like "WHITE_KING". */
+    private String pieceToKey(Piece piece) {
+        if (piece == null) return null;
+        String colorPrefix = (piece.getColor() == utils.Color.WHITE) ? "WHITE_" : "BLACK_";
+        String type = piece.getClass().getSimpleName().toUpperCase(); // KING, QUEEN, etc.
+        return colorPrefix + type;
+    }
+    /** Copies the backend Board state into the GUI squares. */
+    private void syncBoardFromBackend() {
+        for (int row = 0; row < BOARD_SIZE; row++) {
+            for (int col = 0; col < BOARD_SIZE; col++) {
+                Piece p = backendBoard.getPiece(new Position(row, col));
+                String key = pieceToKey(p);
+
+                if (key == null) {
+                    squares[row][col].clearPiece();
+                } else {
+                    squares[row][col].setPiece(key);
+                }
+
+                squares[row][col].setHighlighted(false);
+            }
+        }
+        repaint();
+    }
+
+
 }
