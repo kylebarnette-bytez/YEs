@@ -109,6 +109,12 @@ public class BoardPanel extends JPanel {
      *
      * @param clicked the square that was clicked
      */
+    /**
+     * Handles user clicks on a board square. Determines whether the action
+     * is a piece selection, move attempt, or deselection.
+     *
+     * @param clicked the square that was clicked
+     */
     public void handleSquareClick(SquarePanel clicked) {
 
         if (gameOver) return;
@@ -208,6 +214,20 @@ public class BoardPanel extends JPanel {
             }
         }
 
+        // === ONLINE MULTIPLAYER STEP (send move after applying it locally) ===
+        if (parentGUI != null &&
+                parentGUI.isOnlineMode() &&
+                parentGUI.getOnlineManager().isConnected()) {
+
+            // Basic compact encoding: "r1,c1-r2,c2"
+            String notation =
+                    from.getRow() + "," + from.getCol() + "-" +
+                            to.getRow() + "," + to.getCol();
+
+            parentGUI.getOnlineManager().sendMove(notation);
+        }
+        // =====================================================================
+
         clearHighlights();
         selectedSquare.setHighlighted(false);
         selectedSquare = null;
@@ -233,6 +253,7 @@ public class BoardPanel extends JPanel {
             parentGUI.switchTurnTimer(whiteTurn);
         }
     }
+
 
 
     /**

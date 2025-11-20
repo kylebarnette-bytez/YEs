@@ -29,6 +29,26 @@ public class ChessGUI extends JFrame {
      * Constructs the main Chess GUI window.
      */
     public ChessGUI() {
+
+        JButton hostBtn = new JButton("Host Online Game");
+        hostBtn.addActionListener(e -> {
+            onlineManager.hostGame();
+            onlineMode = true;
+        });
+
+        JButton joinBtn = new JButton("Join Online Game");
+        joinBtn.addActionListener(e -> {
+            String ip = JOptionPane.showInputDialog(this, "Enter Host IP:");
+            if (ip != null && !ip.isEmpty()) {
+                onlineManager.joinGame(ip);
+                onlineMode = true;
+            }
+        });
+
+        topPanel.add(hostBtn);
+        topPanel.add(joinBtn);
+
+
         setTitle("Chess Game");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
@@ -124,6 +144,8 @@ public class ChessGUI extends JFrame {
         setLocationRelativeTo(null);
         startTurnTimer();
         setVisible(true);
+
+
     }
 
     /** Displays an endgame message when checkmate occurs. */
@@ -237,4 +259,12 @@ public class ChessGUI extends JFrame {
     private String whiteTurnText() {
         return boardPanel.isWhiteTurn() ? "White's Turn" : "Black's Turn";
     }
+    public void applyNetworkMove(String notation) {
+        Move move = Move.fromNotation(notation);
+        boardPanel.applyMove(move);
+
+        whiteTurn = !whiteTurn;
+        updateStatus(whiteTurn ? "White's Turn" : "Black's Turn");
+    }
+
 }
