@@ -10,6 +10,10 @@ import java.awt.*;
  */
 public class ChessGUI extends JFrame {
 
+    private boolean onlineMode = false;
+    private OnlineGameManager onlineManager = new OnlineGameManager(this);
+
+
     private final BoardPanel boardPanel;
     private final GameHistoryPanel historyPanel;
     private final JLabel statusLabel;
