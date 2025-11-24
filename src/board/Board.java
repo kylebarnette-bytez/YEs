@@ -228,6 +228,12 @@ public class Board {
 		board[to.getRow()][to.getCol()] = moving;
 		moving.move(to);
 		board[from.getRow()][from.getCol()] = null;
+
+// 🔹 If a pawn moves, disable the two-step option from now on
+		if (moving instanceof Pawn pawn) {
+			pawn.markMoved();
+		}
+
 	}
 
 
@@ -237,6 +243,18 @@ public class Board {
 	public void movePiece(Position from, Position to) {
 		movePiece(from, to, true);
 	}
+	public void undoMove(Position from, Position to,
+						 Piece movedPiece, Piece capturedPiece) {
+		// Restore moved piece back to its original square
+		board[from.getRow()][from.getCol()] = movedPiece;
+		if (movedPiece != null) {
+			movedPiece.move(from);
+		}
+
+		// Restore captured piece (if any) on the destination square
+		board[to.getRow()][to.getCol()] = capturedPiece;
+	}
+
 
 
 	/**
@@ -431,7 +449,7 @@ public class Board {
 	}
 
 
-	private Piece clonePiece(Piece piece, Position newPos) {
+	public Piece clonePiece(Piece piece, Position newPos) {
 		if (piece instanceof King) return new King(piece.getColor(), newPos);
 		if (piece instanceof Queen) return new Queen(piece.getColor(), newPos);
 		if (piece instanceof Rook) return new Rook(piece.getColor(), newPos);

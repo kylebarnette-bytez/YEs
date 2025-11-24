@@ -125,6 +125,9 @@ public class ChessGUI extends JFrame {
         startTurnTimer();
         setVisible(true);
     }
+    public BoardPanel getBoardPanel() {
+        return boardPanel;
+    }
 
     /** Displays an endgame message when checkmate occurs. */
     public void showEndgameMessage(String winner) {

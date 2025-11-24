@@ -11,7 +11,6 @@ import java.awt.*;
 import board.Board;
 import position.Position;
 import pieces.Piece;
-// note: DON'T import utils.Color; we'll use utils.Color fully qualified
 
 /**
  * Represents the main chessboard panel responsible for rendering the 8×8 grid,
@@ -20,15 +19,30 @@ import pieces.Piece;
  */
 public class BoardPanel extends JPanel {
 
-    private Board backendBoard;       // ← REAL chess engine board
-    private boolean gameOver = false; // ← stop clicks after checkmate
+    /** Backend chess engine board (single source of truth). */
+    private Board backendBoard;
+    /** Flag to stop moves once game is over (checkmate). */
+    private boolean gameOver = false;
 
     private static final int BOARD_SIZE = 8;
     private final SquarePanel[][] squares = new SquarePanel[BOARD_SIZE][BOARD_SIZE];
+
+    /** Currently selected square (first click), or null if none. */
     private SquarePanel selectedSquare = null;
+
+    /** True if it's White's turn, false if Black's. */
     private boolean whiteTurn = true;
+
+    /** GUI-level move history (used only for save/load display). */
     private final Stack<MoveRecord> moveHistory = new Stack<>();
+
+    /** Backend move history for proper undo. */
+    private final Stack<BackendMove> backendHistory = new Stack<>();
+
+    /** Reference to parent GUI for status/timers. */
     private ChessGUI parentGUI;
+
+    /** Optional panel that displays move history and captures. */
     private GameHistoryPanel historyPanel;
 
     /**
@@ -38,6 +52,25 @@ public class BoardPanel extends JPanel {
      */
     public void setHistoryPanel(GameHistoryPanel panel) {
         this.historyPanel = panel;
+    }
+
+    /**
+     * Record of a backend move used for true undo of engine state.
+     * Stores cloned copies of the pieces so their internal state (like pawn firstMove)
+     * can be fully restored.
+     */
+    private static class BackendMove {
+        final Position from;
+        final Position to;
+        final Piece movedPiece;     // cloned copy before move
+        final Piece capturedPiece;  // cloned copy of captured piece (or null)
+
+        BackendMove(Position from, Position to, Piece movedPiece, Piece capturedPiece) {
+            this.from = from;
+            this.to = to;
+            this.movedPiece = movedPiece;
+            this.capturedPiece = capturedPiece;
+        }
     }
 
     /**
@@ -51,19 +84,19 @@ public class BoardPanel extends JPanel {
 
     /**
      * Creates a new {@code BoardPanel} with a parent GUI reference.
-     * Initializes the layout, board squares, and starting pieces.
+     * Initializes the layout, board squares, and starting pieces
+     * by syncing from the backend board.
      *
      * @param parent the parent {@link ChessGUI} instance
      */
     public BoardPanel(ChessGUI parent) {
         this.parentGUI = parent;
-        this.backendBoard = new Board(); // uses backend initializeBoard()
+        this.backendBoard = new Board(); // backend initializes standard position
 
         setLayout(new GridLayout(BOARD_SIZE, BOARD_SIZE));
         initializeBoard();
-        syncBoardFromBackend(); // ← NEW: fill squares from backend instead of initializePieces()
+        syncBoardFromBackend();
     }
-
 
     /** Initializes all 64 squares of the chessboard grid. */
     private void initializeBoard() {
@@ -74,33 +107,6 @@ public class BoardPanel extends JPanel {
                 add(square);
             }
         }
-    }
-
-    /** Places all chess pieces in their default starting positions. */
-    private void initializePieces() {
-        for (int col = 0; col < BOARD_SIZE; col++) {
-            squares[1][col].setPiece("BLACK_PAWN");
-        }
-        squares[0][0].setPiece("BLACK_ROOK");
-        squares[0][7].setPiece("BLACK_ROOK");
-        squares[0][1].setPiece("BLACK_KNIGHT");
-        squares[0][6].setPiece("BLACK_KNIGHT");
-        squares[0][2].setPiece("BLACK_BISHOP");
-        squares[0][5].setPiece("BLACK_BISHOP");
-        squares[0][3].setPiece("BLACK_QUEEN");
-        squares[0][4].setPiece("BLACK_KING");
-
-        for (int col = 0; col < BOARD_SIZE; col++) {
-            squares[6][col].setPiece("WHITE_PAWN");
-        }
-        squares[7][0].setPiece("WHITE_ROOK");
-        squares[7][7].setPiece("WHITE_ROOK");
-        squares[7][1].setPiece("WHITE_KNIGHT");
-        squares[7][6].setPiece("WHITE_KNIGHT");
-        squares[7][2].setPiece("WHITE_BISHOP");
-        squares[7][5].setPiece("WHITE_BISHOP");
-        squares[7][3].setPiece("WHITE_QUEEN");
-        squares[7][4].setPiece("WHITE_KING");
     }
 
     /**
@@ -120,6 +126,7 @@ public class BoardPanel extends JPanel {
 
         // 1) First click: select a piece
         if (selectedSquare == null) {
+            // must click on a piece
             if (clickedPiece == null) return;
 
             // must select current player's color
@@ -151,9 +158,11 @@ public class BoardPanel extends JPanel {
             return;
         }
 
-        // 3) Second click → attempt move
+        // 3) Second click → attempt move from selectedSquare to clicked
         Position from = new Position(selectedSquare.getRow(), selectedSquare.getCol());
         Position to   = clickedPos;
+
+
 
         Piece moving = backendBoard.getPiece(from);
         Piece destBefore = backendBoard.getPiece(to); // for capture history
@@ -179,7 +188,18 @@ public class BoardPanel extends JPanel {
             return;
         }
 
-        // Optional: still record GUI move for undo/save (GUI-level)
+        backendHistory.clear();   // <-- allow undo only for the *current* move
+
+        // --- Record backend move for true undo ---
+        // Clone moving piece BEFORE mutation
+        Piece movingCopy = backendBoard.clonePiece(moving, moving.getPosition());
+        // Clone captured piece (if any)
+        Piece capturedCopy = (destBefore == null)
+                ? null
+                : backendBoard.clonePiece(destBefore, destBefore.getPosition());
+        backendHistory.push(new BackendMove(from, to, movingCopy, capturedCopy));
+
+        // Record GUI-level move for save/load (but GUI visuals are always driven by backend)
         moveHistory.push(new MoveRecord(selectedSquare, clicked));
 
         // Perform move in backend
@@ -196,7 +216,7 @@ public class BoardPanel extends JPanel {
         // Sync GUI with backend board state
         syncBoardFromBackend();
 
-        // Update history panel
+        // Update history panel (sidebar)
         if (historyPanel != null) {
             String movingKey = pieceToKey(moving);
             String fromStr = "(" + from.getRow() + "," + from.getCol() + ")";
@@ -234,20 +254,15 @@ public class BoardPanel extends JPanel {
         }
     }
 
-
-    /**
-     * Determines whether the clicked piece belongs to the player whose turn it is.
-     *
-     * @param pieceKey the key representing the piece
-     * @return {@code true} if the turn matches the piece color, otherwise {@code false}
-     */
-    private boolean isCorrectTurn(String pieceKey) {
-        return (whiteTurn && pieceKey.startsWith("WHITE")) ||
-               (!whiteTurn && pieceKey.startsWith("BLACK"));
+    /** Removes all move highlights from the board. */
+    private void clearHighlights() {
+        for (SquarePanel[] rowArr : squares)
+            for (SquarePanel sq : rowArr)
+                sq.setHighlighted(false);
     }
 
     /**
-     * Highlights all legal moves for a given piece based on its type and position.
+     * Highlights all legal moves for a given piece based on backend rules.
      *
      * @param fromSquare the square containing the selected piece
      */
@@ -258,8 +273,8 @@ public class BoardPanel extends JPanel {
         Piece piece = backendBoard.getPiece(from);
         if (piece == null) return;
 
-        java.util.List<Position> rawMoves = piece.possibleMoves(backendBoard);
-        java.util.List<Position> legalMoves = new ArrayList<>();
+        List<Position> rawMoves = piece.possibleMoves(backendBoard);
+        List<Position> legalMoves = new ArrayList<>();
 
         // Filter out moves that would leave this player in check
         utils.Color color = piece.getColor();
@@ -274,56 +289,9 @@ public class BoardPanel extends JPanel {
         }
     }
 
-
-    /**
-     * Generates possible slide-type moves (used by rooks, bishops, and queens).
-     *
-     * @param row starting row
-     * @param col starting column
-     * @param dirs direction vectors
-     * @param piece the moving piece
-     */
-    private void slideMoves(int row, int col, int[][] dirs, String piece) {
-        for (int[] dir : dirs) {
-            int r = row + dir[0], c = col + dir[1];
-            while (r >= 0 && r < 8 && c >= 0 && c < 8) {
-                if (squares[r][c].hasPiece()) {
-                    if (!isSameColor(r, c, piece))
-                        squares[r][c].setHighlighted(true);
-                    break;
-                }
-                squares[r][c].setHighlighted(true);
-                r += dir[0];
-                c += dir[1];
-            }
-        }
-    }
-
-    /**
-     * Checks whether a target square contains a piece of the same color.
-     *
-     * @param r target row
-     * @param c target column
-     * @param piece the moving piece
-     * @return {@code true} if same color; {@code false} otherwise
-     */
-    private boolean isSameColor(int r, int c, String piece) {
-        String target = squares[r][c].getPieceKey();
-        if (target == null) return false;
-        return (piece.startsWith("WHITE") && target.startsWith("WHITE")) ||
-               (piece.startsWith("BLACK") && target.startsWith("BLACK"));
-    }
-
-    /** Removes all move highlights from the board. */
-    private void clearHighlights() {
-        for (SquarePanel[] rowArr : squares)
-            for (SquarePanel sq : rowArr)
-                sq.setHighlighted(false);
-    }
-
     /**
      * Resets the board to its initial state, clearing all pieces,
-     * move history, and highlights.
+     * move history, highlights, and timers.
      */
     public void resetBoard() {
         backendBoard = new Board();   // reset backend model
@@ -331,6 +299,7 @@ public class BoardPanel extends JPanel {
         whiteTurn = true;
         selectedSquare = null;
         moveHistory.clear();
+        backendHistory.clear();
         clearHighlights();
 
         syncBoardFromBackend();       // redraw GUI from backend
@@ -345,8 +314,8 @@ public class BoardPanel extends JPanel {
     }
 
     /**
-     * Saves the current game state (board, turn, and move history) to a file.
-     * Displays a file chooser for user input.
+     * Saves the current game state (board and turn and moveHistory) to a file.
+     * Note: this currently saves based on GUI piece keys, not backend state.
      */
     public void saveGame() {
         JFileChooser fileChooser = new JFileChooser();
@@ -358,6 +327,7 @@ public class BoardPanel extends JPanel {
         try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(file))) {
             GameState state = new GameState();
 
+            // Save board as piece-key strings
             for (int row = 0; row < BOARD_SIZE; row++) {
                 for (int col = 0; col < BOARD_SIZE; col++) {
                     state.board[row][col] = squares[row][col].getPieceKey();
@@ -366,21 +336,28 @@ public class BoardPanel extends JPanel {
 
             state.whiteTurn = this.whiteTurn;
 
+            // Save GUI move history (for possible future replay)
             for (MoveRecord m : moveHistory) {
                 state.moveHistory.add(new GameState.MoveData(
                         m.fromRow, m.fromCol, m.toRow, m.toCol, m.capturedPiece));
             }
 
             out.writeObject(state);
-            JOptionPane.showMessageDialog(this, "Game saved successfully!", "Save", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Game saved successfully!",
+                    "Save", JOptionPane.INFORMATION_MESSAGE);
         } catch (IOException e) {
-            JOptionPane.showMessageDialog(this, "Error saving game: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Error saving game: " + e.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
     /**
      * Loads a previously saved game from file and restores the board, moves,
      * and turn state.
+     *
+     * NOTE: This version restores GUI squares and moveHistory,
+     * but does NOT fully reconstruct backendBoard from the save.
+     * A full backend reconstruction requires more work in Board.java.
      */
     public void loadGame() {
         JFileChooser fileChooser = new JFileChooser();
@@ -392,11 +369,15 @@ public class BoardPanel extends JPanel {
         try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(file))) {
             GameState state = (GameState) in.readObject();
 
+            // Restore GUI from saved board
             for (int row = 0; row < BOARD_SIZE; row++) {
                 for (int col = 0; col < BOARD_SIZE; col++) {
                     squares[row][col].setPiece(state.board[row][col]);
                 }
             }
+
+            // TODO (better): Rebuild backendBoard from state.board piece keys
+            // and call syncBoardFromBackend().
 
             this.whiteTurn = state.whiteTurn;
             if (parentGUI != null)
@@ -413,28 +394,53 @@ public class BoardPanel extends JPanel {
             revalidate();
             repaint();
 
-            JOptionPane.showMessageDialog(this, "Game loaded successfully!", "Load", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Game loaded successfully!",
+                    "Load", JOptionPane.INFORMATION_MESSAGE);
         } catch (IOException | ClassNotFoundException e) {
-            JOptionPane.showMessageDialog(this, "Error loading game: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Error loading game: " + e.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
     /**
-     * Undoes the most recent move, restoring the previous board state.
+     * Undoes the most recent move, restoring the backend board state
+     * and re-syncing the GUI.
      */
     public void undoLastMove() {
-        if (!moveHistory.isEmpty()) {
-            MoveRecord last = moveHistory.pop();
-            last.undo();
-            whiteTurn = !whiteTurn;
-            if (parentGUI != null)
-                parentGUI.updateStatus(whiteTurn ? "White's Turn" : "Black's Turn");
-            if (historyPanel != null)
-                historyPanel.removeLastMove();
+        // 1) We can only undo if backend has moves
+        if (backendHistory.isEmpty()) {
+            if (parentGUI != null) parentGUI.flashMessage("No moves left to undo.");
+            return;
+        }
+
+        // 2) Pop backend move first (REAL undo)
+        BackendMove lastBackend = backendHistory.pop();
+        backendBoard.undoMove(
+                lastBackend.from,
+                lastBackend.to,
+                lastBackend.movedPiece,
+                lastBackend.capturedPiece
+        );
+
+        // 3) Resync GUI to backend
+        syncBoardFromBackend();
+        clearHighlights();
+        selectedSquare = null;
+
+        // 4) Keep the history panel in sync visually
+        if (historyPanel != null) {
+            historyPanel.removeLastMove();
+        }
+
+        // 5) Flip turn and update status/timer
+        whiteTurn = !whiteTurn;
+        if (parentGUI != null) {
+            parentGUI.updateStatus(whiteTurn ? "White's Turn" : "Black's Turn");
+            parentGUI.switchTurnTimer(whiteTurn);
         }
     }
 
-    /** Represents a record of a single chess move, used for undo and save/load. */
+    /** Represents a record of a single chess move, used for save/load. */
     private static class MoveRecord {
         private final SquarePanel from, to;
         private final String capturedPiece;
@@ -452,14 +458,6 @@ public class BoardPanel extends JPanel {
             this.fromCol = from.getCol();
             this.toRow = to.getRow();
             this.toCol = to.getCol();
-        }
-
-        void undo() {
-            from.setPiece(to.getPieceKey());
-            if (capturedPiece != null)
-                to.setPiece(capturedPiece);
-            else
-                to.clearPiece();
         }
     }
 
@@ -482,6 +480,7 @@ public class BoardPanel extends JPanel {
             }
         }
     }
+
     /** Converts a backend Piece into a GUI pieceKey like "WHITE_KING". */
     private String pieceToKey(Piece piece) {
         if (piece == null) return null;
@@ -489,6 +488,7 @@ public class BoardPanel extends JPanel {
         String type = piece.getClass().getSimpleName().toUpperCase(); // KING, QUEEN, etc.
         return colorPrefix + type;
     }
+
     /** Copies the backend Board state into the GUI squares. */
     private void syncBoardFromBackend() {
         for (int row = 0; row < BOARD_SIZE; row++) {
@@ -507,6 +507,4 @@ public class BoardPanel extends JPanel {
         }
         repaint();
     }
-
-
 }

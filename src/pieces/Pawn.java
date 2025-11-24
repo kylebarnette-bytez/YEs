@@ -45,6 +45,13 @@ public class Pawn extends Piece {
 	public Pawn(Color color, Position position) {
 		super(color, position);
 	}
+	public boolean isFirstMove() {
+		return firstMove;
+	}
+
+	public void setFirstMove(boolean value) {
+		this.firstMove = value;
+	}
 
 	/**
 	 * Marks this pawn as having moved at least once.
