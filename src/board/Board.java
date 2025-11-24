@@ -458,5 +458,12 @@ public class Board {
 		if (piece instanceof Pawn) return new Pawn(piece.getColor(), newPos);
 		throw new IllegalArgumentException("Unknown piece type");
 	}
+	public void clearAllPieces() {
+		for (int r = 0; r < 8; r++) {
+			for (int c = 0; c < 8; c++) {
+				board[r][c] = null;
+			}
+		}
+	}
 
 }

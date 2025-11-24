@@ -317,6 +317,10 @@ public class BoardPanel extends JPanel {
      * Saves the current game state (board and turn and moveHistory) to a file.
      * Note: this currently saves based on GUI piece keys, not backend state.
      */
+    /**
+     * Saves the FULL backend game state (board, turn, move history)
+     * to a file chosen by the user.
+     */
     public void saveGame() {
         JFileChooser fileChooser = new JFileChooser();
         int option = fileChooser.showSaveDialog(this);
@@ -327,29 +331,60 @@ public class BoardPanel extends JPanel {
         try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(file))) {
             GameState state = new GameState();
 
-            // Save board as piece-key strings
+            // --- Save backend board ---
             for (int row = 0; row < BOARD_SIZE; row++) {
                 for (int col = 0; col < BOARD_SIZE; col++) {
-                    state.board[row][col] = squares[row][col].getPieceKey();
+
+                    Position pos = new Position(row, col);
+                    Piece p = backendBoard.getPiece(pos);
+
+                    if (p == null) {
+                        state.board[row][col] = null;
+                    } else {
+
+                        boolean first = false;
+                        if (p instanceof pieces.Pawn) {
+                            first = ((pieces.Pawn)p).isFirstMove();
+                        }
+
+                        state.board[row][col] = new GameState.PieceData(
+                                p.getClass().getSimpleName(),  // "Pawn", "Rook", etc.
+                                p.getColor(),                  // WHITE or BLACK
+                                first                          // pawn firstMove
+                        );
+                    }
                 }
             }
 
+            // Save turn
             state.whiteTurn = this.whiteTurn;
 
-            // Save GUI move history (for possible future replay)
+            // Save GUI move history (optional but useful)
             for (MoveRecord m : moveHistory) {
                 state.moveHistory.add(new GameState.MoveData(
                         m.fromRow, m.fromCol, m.toRow, m.toCol, m.capturedPiece));
             }
 
+            // Write to file
             out.writeObject(state);
-            JOptionPane.showMessageDialog(this, "Game saved successfully!",
-                    "Save", JOptionPane.INFORMATION_MESSAGE);
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Game saved successfully!",
+                    "Save",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+
         } catch (IOException e) {
-            JOptionPane.showMessageDialog(this, "Error saving game: " + e.getMessage(),
-                    "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Error saving game: " + e.getMessage(),
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE
+            );
         }
     }
+
 
     /**
      * Loads a previously saved game from file and restores the board, moves,
@@ -359,6 +394,10 @@ public class BoardPanel extends JPanel {
      * but does NOT fully reconstruct backendBoard from the save.
      * A full backend reconstruction requires more work in Board.java.
      */
+    /**
+     * Loads a previously saved game from file and fully restores backend state,
+     * GUI state, move history, and turn state.
+     */
     public void loadGame() {
         JFileChooser fileChooser = new JFileChooser();
         int option = fileChooser.showOpenDialog(this);
@@ -367,22 +406,64 @@ public class BoardPanel extends JPanel {
         File file = fileChooser.getSelectedFile();
 
         try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(file))) {
+
             GameState state = (GameState) in.readObject();
 
-            // Restore GUI from saved board
+            // ----------------------------------------------------
+            // 1) REBUILD BACKEND BOARD FROM SAVE FILE
+            // ----------------------------------------------------
+            backendBoard = new Board();
+            backendBoard.clearAllPieces();   // we added this helper in Board.java
+
             for (int row = 0; row < BOARD_SIZE; row++) {
                 for (int col = 0; col < BOARD_SIZE; col++) {
-                    squares[row][col].setPiece(state.board[row][col]);
+
+                    GameState.PieceData d = state.board[row][col];
+                    if (d == null) continue;
+
+                    Position pos = new Position(row, col);
+                    Piece newPiece = null;
+
+                    switch (d.type) {
+                        case "Pawn":
+                            pieces.Pawn pawn = new pieces.Pawn(d.color, pos);
+                            pawn.setFirstMove(d.firstMove);
+                            newPiece = pawn;
+                            break;
+                        case "Rook":
+                            newPiece = new pieces.Rook(d.color, pos);
+                            break;
+                        case "Knight":
+                            newPiece = new pieces.Knight(d.color, pos);
+                            break;
+                        case "Bishop":
+                            newPiece = new pieces.Bishop(d.color, pos);
+                            break;
+                        case "Queen":
+                            newPiece = new pieces.Queen(d.color, pos);
+                            break;
+                        case "King":
+                            newPiece = new pieces.King(d.color, pos);
+                            break;
+                    }
+
+                    backendBoard.setPiece(newPiece, pos);
                 }
             }
 
-            // TODO (better): Rebuild backendBoard from state.board piece keys
-            // and call syncBoardFromBackend().
-
+            // ----------------------------------------------------
+            // 2) RESTORE TURN STATE
+            // ----------------------------------------------------
             this.whiteTurn = state.whiteTurn;
-            if (parentGUI != null)
-                parentGUI.updateStatus(whiteTurn ? "White's Turn" : "Black's Turn");
 
+            if (parentGUI != null) {
+                parentGUI.updateStatus(whiteTurn ? "White's Turn" : "Black's Turn");
+                parentGUI.switchTurnTimer(whiteTurn);
+            }
+
+            // ----------------------------------------------------
+            // 3) RESTORE MOVE HISTORY (GUI-ONLY, not backend undo)
+            // ----------------------------------------------------
             moveHistory.clear();
             for (GameState.MoveData md : state.moveHistory) {
                 moveHistory.add(new MoveRecord(
@@ -391,16 +472,36 @@ public class BoardPanel extends JPanel {
                         md.capturedPiece));
             }
 
+            // ----------------------------------------------------
+            // 4) RESET UNDO FOR SAFETY
+            // ----------------------------------------------------
+            backendHistory.clear();
+
+            // ----------------------------------------------------
+            // 5) SYNC GUI SQUARES TO BACKEND BOARD
+            // ----------------------------------------------------
+            syncBoardFromBackend();
+
             revalidate();
             repaint();
 
-            JOptionPane.showMessageDialog(this, "Game loaded successfully!",
-                    "Load", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Game loaded successfully!",
+                    "Load",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+
         } catch (IOException | ClassNotFoundException e) {
-            JOptionPane.showMessageDialog(this, "Error loading game: " + e.getMessage(),
-                    "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Error loading game: " + e.getMessage(),
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE
+            );
         }
     }
+
 
     /**
      * Undoes the most recent move, restoring the backend board state
@@ -462,10 +563,24 @@ public class BoardPanel extends JPanel {
     }
 
     /** Serializable container for game save data (board, turn, and move history). */
+    /** Serializable container for FULL backend save data */
     private static class GameState implements Serializable {
-        String[][] board = new String[BOARD_SIZE][BOARD_SIZE];
+        PieceData[][] board = new PieceData[BOARD_SIZE][BOARD_SIZE];
         boolean whiteTurn;
         List<MoveData> moveHistory = new ArrayList<>();
+
+        /** Fully describes a backend piece */
+        static class PieceData implements Serializable {
+            String type;           // "Pawn", "Rook", "Queen", etc.
+            utils.Color color;     // WHITE or BLACK
+            boolean firstMove;     // only used for Pawn
+
+            PieceData(String type, utils.Color color, boolean firstMove) {
+                this.type = type;
+                this.color = color;
+                this.firstMove = firstMove;
+            }
+        }
 
         static class MoveData implements Serializable {
             int fromRow, fromCol, toRow, toCol;
@@ -480,6 +595,7 @@ public class BoardPanel extends JPanel {
             }
         }
     }
+
 
     /** Converts a backend Piece into a GUI pieceKey like "WHITE_KING". */
     private String pieceToKey(Piece piece) {
@@ -507,4 +623,5 @@ public class BoardPanel extends JPanel {
         }
         repaint();
     }
+
 }
