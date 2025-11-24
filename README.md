@@ -14,8 +14,8 @@ OOP Project CS3354 Repository
 Instructions to compile and run:
 - Navigate to the /src/ folder
 - Inpute the following commands:
-    javac board/\*.java game/\*.java gui/\*.java pieces/\*.java position/\*.java utils/*.java
-    java gui/GuiMain
+    - javac board/\*.java game/\*.java gui/\*.java pieces/\*.java position/\*.java utils/*.java
+    - java gui/GuiMain
 
 List of features:
 - Interactive chess GUI that allows for moving peices by clicking on squares
