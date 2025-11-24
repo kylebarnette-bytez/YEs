@@ -14,7 +14,7 @@ OOP Project CS3354 Repository
 Instructions to compile and run:
 - Navigate to the /src/ folder
 - Inpute the following commands:
-    javac board/*.java game/*.java gui/*.java pieces/*.java position/*.java utils/*.java
+    javac board/\*.java game/\*.java gui/\*.java pieces/\*.java position/\*.java utils/*.java
     java gui/GuiMain
 
 List of features:
