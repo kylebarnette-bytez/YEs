@@ -1117,7 +1117,38 @@ public class BoardPanel extends JPanel {
             // ----------------------------------------------------
             // 4) RESET UNDO FOR SAFETY (optional – no undo history after load)
             // ----------------------------------------------------
+// ----------------------------------------------------
+// 4) REBUILD backendHistory so undo works after load
+// ----------------------------------------------------
             backendHistory.clear();
+
+// Create a temporary clean board to simulate moves from the start
+            Board temp = new Board();
+
+// For each saved move, re-simulate it to rebuild undo history
+            for (GameState.MoveData md : state.moveHistory) {
+
+                Position from = new Position(md.fromRow, md.fromCol);
+                Position to   = new Position(md.toRow, md.toCol);
+
+                Piece moving   = temp.getPiece(from);
+                Piece captured = temp.getPiece(to);
+
+                // Clone BEFORE mutation (exactly like you do in handleSquareClick)
+                Piece movingCopy = (moving != null)
+                        ? backendBoard.clonePiece(moving, moving.getPosition())
+                        : null;
+
+                Piece capturedCopy = (captured != null)
+                        ? backendBoard.clonePiece(captured, captured.getPosition())
+                        : null;
+
+                // Push reconstructed undo record
+                backendHistory.push(new BackendMove(from, to, movingCopy, capturedCopy));
+
+                // Perform the move on temp board
+                temp.movePiece(from, to);
+            }
 
             // ----------------------------------------------------
             // 5) SYNC GUI SQUARES TO BACKEND BOARD
