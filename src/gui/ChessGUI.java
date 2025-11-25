@@ -12,43 +12,40 @@ public class ChessGUI extends JFrame {
 
     private final BoardPanel boardPanel;
     private final GameHistoryPanel historyPanel;
-    private final JLabel statusLabel;
 
+    private final JLabel statusLabel;
     private JLabel whiteTimerLabel;
     private JLabel blackTimerLabel;
 
     private javax.swing.Timer swingTimer;
 
-    // ⬇⬇⬇ NEW turn-based timer: 30 seconds per move
-    private int turnSeconds = 30;
+    // OLD TIMER SYSTEM — Each player has a total clock (5 minutes default)
+    private int whiteSeconds = 300;
+    private int blackSeconds = 300;
 
-    // Track whose turn it is
+    // Tracks whose turn it is (controlled ONLY by the board / moves)
     private boolean whiteTurn = true;
 
-    /**
-     * Constructs the main Chess GUI window.
-     */
     public ChessGUI() {
+
         setTitle("Chess Game");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
         setSize(900, 800);
 
         // -------------------------
-        // CENTER: Chess Board
+        // CENTER: Board
         // -------------------------
         boardPanel = new BoardPanel(this);
         add(boardPanel, BorderLayout.CENTER);
 
         // -------------------------
-        // EAST: Side Panel (Undo, Exit, History)
+        // EAST: Undo, Exit, History
         // -------------------------
         JPanel sidePanel = new JPanel(new BorderLayout());
         sidePanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         JPanel controlPanel = new JPanel(new GridLayout(5, 1, 10, 10));
-        controlPanel.setMaximumSize(new Dimension(200, 120));
-
         JButton undoBtn = new JButton("Undo Move");
         JButton exitBtn = new JButton("Exit");
 
@@ -67,19 +64,19 @@ public class ChessGUI extends JFrame {
         add(sidePanel, BorderLayout.EAST);
 
         // -------------------------
-        // SOUTH: Status Bar
+        // SOUTH: Status label
         // -------------------------
         statusLabel = new JLabel("White's Turn", SwingConstants.CENTER);
         statusLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
         statusLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
 
         // -------------------------
-        // NORTH: Timer Bar
+        // NORTH: Timer bar
         // -------------------------
         JPanel timerPanel = new JPanel(new GridLayout(1, 2));
 
-        whiteTimerLabel = new JLabel("White: 00:30", SwingConstants.CENTER);
-        blackTimerLabel = new JLabel("Black: --", SwingConstants.CENTER);
+        whiteTimerLabel  = new JLabel("White: 05:00", SwingConstants.CENTER);
+        blackTimerLabel  = new JLabel("Black: 05:00", SwingConstants.CENTER);
 
         whiteTimerLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
         blackTimerLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
@@ -99,9 +96,14 @@ public class ChessGUI extends JFrame {
         JMenuItem newGameItem = new JMenuItem("New Game");
         JMenuItem saveGameItem = new JMenuItem("Save Game");
         JMenuItem loadGameItem = new JMenuItem("Load Game");
-        JMenuItem resetTimersItem = new JMenuItem("Reset Turn Timer");
+        JMenuItem resetTimersItem = new JMenuItem("Reset Timers");
 
-        resetTimersItem.addActionListener(e -> resetTimers());
+        resetTimersItem.addActionListener(e -> {
+            whiteSeconds = 300;
+            blackSeconds = 300;
+            updateTimerLabels();
+        });
+
         newGameItem.addActionListener(e -> {
             boardPanel.resetBoard();
             resetTimers();
@@ -118,78 +120,43 @@ public class ChessGUI extends JFrame {
         menuBar.add(gameMenu);
         setJMenuBar(menuBar);
 
-        // -------------------------
-        // Final window setup
-        // -------------------------
         setLocationRelativeTo(null);
         startTurnTimer();
         setVisible(true);
     }
+
     public BoardPanel getBoardPanel() {
         return boardPanel;
     }
 
-    /** Displays an endgame message when checkmate occurs. */
-    public void showEndgameMessage(String winner) {
-        if (swingTimer != null) swingTimer.stop();
-        JOptionPane.showMessageDialog(this,
-                winner + " wins! Game over.",
-                "Checkmate",
-                JOptionPane.INFORMATION_MESSAGE);
-        System.exit(0);
+    /** Updates button/status bar messages. */
+    public void updateStatus(String msg) {
+        statusLabel.setText(msg);
     }
 
-    /** Update status text. */
-    public void updateStatus(String text) {
-        statusLabel.setText(text);
-    }
-
-    // --------------------------------------------------------
-    //   TURN TIMER (30 seconds per turn)
-    // --------------------------------------------------------
+    // ======================================================
+    //   OLD TIMER SYSTEM (White & Black countdown clocks)
+    // ======================================================
     private void startTurnTimer() {
+
         if (swingTimer != null && swingTimer.isRunning())
             swingTimer.stop();
 
-        turnSeconds = 30; // reset each turn
-        updateTimerLabels();
-
         swingTimer = new javax.swing.Timer(1000, e -> {
-            turnSeconds--;
 
-            if (turnSeconds <= 0) {
-                String expired = whiteTurn ? "White" : "Black";
-                String next = whiteTurn ? "Black" : "White";
-
-                // Console debug (optional)
-                System.out.println("[TIMER] " + expired + " ran out of time. Switching turn to " + next + ".");
-
-                // Flash GUI message
-                flashMessage(expired + " ran out of time — " + next + " moves.");
-                JOptionPane.showMessageDialog(
-                        this,
-                        expired + " ran out of time — " + next + " moves!",
-                        "Turn Timeout",
-                        JOptionPane.INFORMATION_MESSAGE
-                );
-
-                // Switch turn, but DO NOT restart timer yet!
-                whiteTurn = !whiteTurn;
-
-                // Delay the next timer start so the flashMessage can appear
-                new javax.swing.Timer(150, e2 -> {
-                    // DO NOT call updateStatus here; flashMessage resets it automatically
-                    startTurnTimer();  // now start the next turn’s 30 seconds
-                }) {{
-                    setRepeats(false);
-                    start();
-                }};
-
-                return; // clean exit
+            if (whiteTurn) {
+                whiteSeconds--;
+                if (whiteSeconds <= 0) {
+                    endGameOnTimeout("Black");
+                    return;
+                }
+            } else {
+                blackSeconds--;
+                if (blackSeconds <= 0) {
+                    endGameOnTimeout("White");
+                    return;
+                }
             }
-
-
-
 
             updateTimerLabels();
         });
@@ -197,47 +164,74 @@ public class ChessGUI extends JFrame {
         swingTimer.start();
     }
 
-    /** Update the timer display for whichever side's turn it is. */
+    /** Updates both timer labels (White & Black). */
     private void updateTimerLabels() {
-        if (whiteTurn) {
-            whiteTimerLabel.setText("White: " + formatTime(turnSeconds));
-            blackTimerLabel.setText("Black: --");
-        } else {
-            whiteTimerLabel.setText("White: --");
-            blackTimerLabel.setText("Black: " + formatTime(turnSeconds));
-        }
+        whiteTimerLabel.setText("White: " + formatTime(whiteSeconds));
+        blackTimerLabel.setText("Black: " + formatTime(blackSeconds));
     }
 
-    /** Reset the turn timer manually. */
+    /** Reset both clocks (5:00) and restart timer for White. */
     public void resetTimers() {
         if (swingTimer != null) swingTimer.stop();
+
+        whiteSeconds = 300;
+        blackSeconds = 300;
         whiteTurn = true;
+
+        updateTimerLabels();
         startTurnTimer();
     }
 
-    /** Formats time into MM:SS. */
-    private String formatTime(int seconds) {
-        int m = seconds / 60;
-        int s = seconds % 60;
+    /** Format seconds into MM:SS. */
+    private String formatTime(int sec) {
+        int m = sec / 60;
+        int s = sec % 60;
         return String.format("%02d:%02d", m, s);
     }
 
-    /** Called when a move changes the turn. */
+    /** This is the old behavior — timeout ends the game immediately. */
+    private void endGameOnTimeout(String winner) {
+        if (swingTimer != null) swingTimer.stop();
+
+        JOptionPane.showMessageDialog(
+                this,
+                "Time's up! " + winner + " wins!",
+                "Timeout",
+                JOptionPane.INFORMATION_MESSAGE
+        );
+
+        System.exit(0);
+    }
+
+    /**
+     * Called by the board when a valid move occurs.
+     * ONLY THIS should change turns — NOT the timer.
+     */
     public void switchTurnTimer(boolean whiteTurnNow) {
         this.whiteTurn = whiteTurnNow;
         startTurnTimer();
     }
 
-    /** Show a temporary message then revert. */
+    public void showEndgameMessage(String winner) {
+        if (swingTimer != null) swingTimer.stop();
+        JOptionPane.showMessageDialog(
+                this,
+                winner + " wins! Game over.",
+                "Checkmate",
+                JOptionPane.INFORMATION_MESSAGE
+        );
+        System.exit(0);
+    }
+
+    /** Flash message then revert back. */
     public void flashMessage(String text) {
         statusLabel.setText(text);
-        new javax.swing.Timer(2000, e -> statusLabel.setText(whiteTurnText())) {{
+
+        new javax.swing.Timer(2000, e ->
+                statusLabel.setText(whiteTurn ? "White's Turn" : "Black's Turn")
+        ) {{
             setRepeats(false);
             start();
         }};
-    }
-
-    private String whiteTurnText() {
-        return boardPanel.isWhiteTurn() ? "White's Turn" : "Black's Turn";
     }
 }
