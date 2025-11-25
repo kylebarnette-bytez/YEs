@@ -6,7 +6,9 @@ Fall 2025, CS3354 Object Oriented Design and Programming, Section R01
 
 OOP Project CS3354 Repository
 
-<img width="1756" height="1494" alt="image" src="https://github.com/user-attachments/assets/5780e9a5-a986-4491-9a59-8b1102c92e27" />
+<img width="1764" height="1498" alt="Screenshot 2025-11-25 165135" src="https://github.com/user-attachments/assets/ef089ba6-32c0-4753-9e82-d58909f36271" />
+
+<img width="1765" height="1493" alt="Screenshot 2025-11-25 165235" src="https://github.com/user-attachments/assets/40d48a11-bcbc-4f80-bd05-e43dc62b32eb" />
 
 <img width="1500" height="780" alt="UMLChess" src="https://github.com/user-attachments/assets/5c412f70-2ff9-4cb3-85fc-762b19bc5ab1" />
 
